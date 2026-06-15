@@ -1,0 +1,21 @@
+[package]
+name = "cred402_evidence_mirror"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+description = "Cred402 Solana satellite — cred402_evidence_mirror"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "cred402_evidence_mirror"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }

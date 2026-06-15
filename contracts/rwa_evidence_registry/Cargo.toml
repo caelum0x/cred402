@@ -1,0 +1,16 @@
+[package]
+name = "rwa_evidence_registry"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+odra = { workspace = true }
+
+[dev-dependencies]
+odra-test = { workspace = true }
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []

@@ -1,0 +1,27 @@
+[workspace]
+resolver = "2"
+members = [
+    "agent_registry",
+    "x402_receipt_registry",
+    "rwa_evidence_registry",
+    "agent_credit_pool",
+    "risk_policy_manager",
+    "dispute_court",
+    "slashing_vault",
+    "governance",
+    "rwa_asset_registry",
+    "reputation_engine",
+    "agent_passport",
+    "fiat_receipt_registry",
+    "operator_verification_registry",
+    "realfi_attestation_registry",
+]
+
+[workspace.dependencies]
+odra = { version = "1.4.0", default-features = false }
+odra-test = { version = "1.4.0", default-features = false }
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "z"

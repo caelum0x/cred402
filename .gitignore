@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.DS_Store
+*.log
+contracts/**/target/
+frontend/dist/
+frontend/node_modules/
+.env
+.cred402-state.json

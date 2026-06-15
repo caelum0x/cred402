@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cred402.dev/schemas/universal-receipt-envelope.schema.json",
+  "title": "Cred402Receipt",
+  "type": "object",
+  "required": [
+    "type", "version", "origin_chain", "settlement_network", "payer_agent_id", "seller_agent_id",
+    "payer_address", "seller_address", "asset", "amount", "service_type", "request_hash",
+    "result_hash", "payment_proof_hash", "settlement_tx_hash", "nonce", "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "Cred402Receipt" },
+    "version": { "const": "1" },
+    "origin_chain": { "type": "string" },
+    "settlement_network": { "type": "string" },
+    "payer_agent_id": { "type": "string" },
+    "seller_agent_id": { "type": "string" },
+    "payer_address": { "type": "string" },
+    "seller_address": { "type": "string" },
+    "asset": { "type": "string" },
+    "amount": { "type": "string", "pattern": "^[0-9]+$" },
+    "service_type": { "type": "string" },
+    "request_hash": { "type": "string" },
+    "result_hash": { "type": "string" },
+    "payment_proof_hash": { "type": "string" },
+    "settlement_tx_hash": { "type": "string" },
+    "nonce": { "type": "string" },
+    "created_at": { "type": "integer", "minimum": 0 }
+  }
+}

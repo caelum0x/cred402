@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cred402.dev/schemas/credit-authorization-note.schema.json",
+  "title": "Cred402CreditAuthorizationNote",
+  "type": "object",
+  "required": [
+    "type", "version", "note_id", "agent_id", "target_chain", "target_pool", "max_draw",
+    "asset", "credit_score", "risk_policy_version", "global_exposure_after_draw", "expires_at", "nonce"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "Cred402CreditAuthorizationNote" },
+    "version": { "const": "1" },
+    "note_id": { "type": "string" },
+    "agent_id": { "type": "string" },
+    "target_chain": { "type": "string" },
+    "target_pool": { "type": "string" },
+    "max_draw": { "type": "string", "pattern": "^[0-9]+$" },
+    "asset": { "type": "string" },
+    "credit_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "risk_policy_version": { "type": "integer", "minimum": 0 },
+    "global_exposure_after_draw": { "type": "string", "pattern": "^[0-9]+$" },
+    "expires_at": { "type": "integer", "minimum": 0 },
+    "nonce": { "type": "string" },
+    "casper_policy_signature": { "type": "string" }
+  }
+}

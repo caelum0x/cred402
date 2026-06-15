@@ -1,0 +1,11 @@
+{
+  "name": "@cred402/chain-adapters",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cred402 multichain adapter SDK — Casper root + EVM/Solana/Cosmos/Move/Bitcoin satellites.",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

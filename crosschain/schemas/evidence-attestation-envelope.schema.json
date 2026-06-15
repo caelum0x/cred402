@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cred402.dev/schemas/evidence-attestation-envelope.schema.json",
+  "title": "Cred402EvidenceAttestation",
+  "type": "object",
+  "required": [
+    "type", "version", "uaid", "agent_id", "origin_chain", "evidence_type",
+    "evidence_hash", "source_hash", "linked_receipt_id", "confidence_bps", "timestamp"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "Cred402EvidenceAttestation" },
+    "version": { "const": "1" },
+    "uaid": { "type": "string", "pattern": "^uaid:[a-z0-9_-]+:[0-9a-f]{64}$" },
+    "agent_id": { "type": "string" },
+    "origin_chain": { "type": "string" },
+    "evidence_type": { "type": "string" },
+    "evidence_hash": { "type": "string" },
+    "source_hash": { "type": "string" },
+    "linked_receipt_id": { "type": "string" },
+    "confidence_bps": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "timestamp": { "type": "integer", "minimum": 0 },
+    "signature": { "type": "string" }
+  }
+}

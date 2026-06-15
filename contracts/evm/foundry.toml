@@ -1,0 +1,27 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+solc_version = "0.8.24"
+optimizer = true
+optimizer_runs = 200
+evm_version = "cancun"
+# via_ir avoids "stack too deep" in the credit-note verifier and keeps the whole
+# satellite suite (incl. Cred402RealFiMirror) compiling reproducibly.
+via_ir = true
+ffi = false
+fs_permissions = [{ access = "read", path = "./" }]
+
+[profile.default.fuzz]
+runs = 256
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = true
+int_types = "long"
+
+# Cred402 EVM satellite.
+# "Casper-rooted, chain-executed." EVM executes credit; Casper approves credit.

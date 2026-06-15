@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+members = [
+    "programs/cred402_satellite_registry",
+    "programs/cred402_receipt_outbox",
+    "programs/cred402_evidence_mirror",
+    "programs/cred402_credit_vault",
+    "programs/cred402_exposure_reporter",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/cred402/cred402"
+
+[workspace.dependencies]
+anchor-lang = "0.30.1"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1

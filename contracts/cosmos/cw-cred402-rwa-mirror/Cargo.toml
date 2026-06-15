@@ -1,0 +1,24 @@
+[package]
+name = "cw-cred402-rwa-mirror"
+version = "0.1.0"
+authors = ["Cred402"]
+edition = "2021"
+description = "Cred402 Cosmos satellite: mirrors Casper RWA registry state (UAID, valuation, evidence digest) for appchain RWA markets"
+license = "Apache-2.0"
+repository = "https://github.com/cred402/cred402"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+library = []
+
+[dependencies]
+cosmwasm-std = { version = "2.1", features = ["staking", "stargate"] }
+cosmwasm-schema = "2.1"
+cw-storage-plus = "2.0"
+thiserror = "1.0"
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+[dev-dependencies]
+cosmwasm-std = { version = "2.1", features = ["staking", "stargate"] }

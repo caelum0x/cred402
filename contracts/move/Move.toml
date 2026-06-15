@@ -1,0 +1,34 @@
+[package]
+name = "cred402_satellite"
+version = "0.1.0"
+edition = "2024.beta"
+authors = ["Cred402 — Casper-rooted, chain-executed"]
+license = "Apache-2.0"
+
+# Cred402 Move satellite.
+#
+# "Casper first. Casper forever as root. Then all chains as satellites."
+#
+# Move chains (Sui / Aptos style) act as EXECUTION + LIQUIDITY satellites:
+#   - asset-safe credit vaults
+#   - local agent passports (satellite registry)
+#   - receipt commitments (outbox)
+#   - RWA mirrors
+#
+# Casper remains the canonical root of identity, reputation, x402 receipt history,
+# RWA evidence, credit policy, disputes, and GLOBAL EXPOSURE. A Move credit vault
+# may only lend against a valid, unexpired, target-matching, Casper-policy-signed
+# Credit Authorization Note (CAN), and never beyond CAN.max_draw.
+#
+# This package targets the Sui Move dialect (object model + `sui::ed25519`). The
+# struct layout, canonical-JSON reconstruction, and ed25519 verification mirror
+# the canonical TypeScript standards in crosschain/standards EXACTLY.
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+cred402 = "0x0"
+
+[dev-addresses]
+cred402 = "0x0"

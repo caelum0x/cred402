@@ -1,0 +1,36 @@
+{
+  "chain": "casper-test",
+  "deployed_at": "2026-06-15T21:44:22.107Z",
+  "contracts": [
+    {
+      "name": "AgentRegistry",
+      "crate": "agent_registry",
+      "contract_hash": "hash-28b3315527d103d4f2ad3676915ffbbe133fe228",
+      "deploy_hash": "28b3315527d103d4f2ad3676915ffbbe133fe2289ffd6c0fdff07d079deab60a"
+    },
+    {
+      "name": "X402ReceiptRegistry",
+      "crate": "x402_receipt_registry",
+      "contract_hash": "hash-74989fde113564926ae0003a9bbdac4174b2fddd",
+      "deploy_hash": "74989fde113564926ae0003a9bbdac4174b2fddda32ea45cd62d5effda9f5ec3"
+    },
+    {
+      "name": "RWAEvidenceRegistry",
+      "crate": "rwa_evidence_registry",
+      "contract_hash": "hash-4873e46e42da8ee2d9d8114d3ebec1253b8c48da",
+      "deploy_hash": "4873e46e42da8ee2d9d8114d3ebec1253b8c48dac748b7ada0aca64e39359860"
+    },
+    {
+      "name": "AgentCreditPool",
+      "crate": "agent_credit_pool",
+      "contract_hash": "hash-bb710419b372b0c34255be3b165a3af27412f3c7",
+      "deploy_hash": "bb710419b372b0c34255be3b165a3af27412f3c71446df62eeeac361935a15eb"
+    },
+    {
+      "name": "RiskPolicyManager",
+      "crate": "risk_policy_manager",
+      "contract_hash": "hash-bb990b79f8a314a3af83c5f5672414789312fca5",
+      "deploy_hash": "bb990b79f8a314a3af83c5f5672414789312fca567a6f454aa2da78f58537cd2"
+    }
+  ]
+}

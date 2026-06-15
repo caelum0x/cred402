@@ -1,0 +1,40 @@
+{
+  "name": "cred402",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cred402 — credit lines for autonomous RWA agents on Casper. x402 machine-to-machine revenue becomes on-chain reputation and DeFi credit.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch api/server.ts",
+    "start": "tsx api/server.ts",
+    "demo": "tsx scripts/run_demo_flow.ts",
+    "demo:dispute": "tsx scripts/run_demo_flow.ts --dispute",
+    "demo:multichain": "tsx scripts/multichain_demo.ts",
+    "demo:marketplace": "tsx scripts/marketplace_demo.ts",
+    "demo:realfi": "tsx scripts/realfi_demo.ts",
+    "ship:check": "tsx scripts/ship_first_check.ts",
+    "demo:request-evidence": "tsx scripts/steps.ts request-evidence",
+    "demo:pay-x402": "tsx scripts/steps.ts pay-x402",
+    "demo:submit-evidence": "tsx scripts/steps.ts submit-evidence",
+    "demo:score-agent": "tsx scripts/steps.ts score-agent",
+    "deploy:testnet": "tsx scripts/deploy_testnet.ts",
+    "seed": "tsx scripts/seed_demo_agents.ts",
+    "mcp": "tsx mcp/server.ts",
+    "mcp:demo": "tsx scripts/mcp_demo.ts",
+    "sdk:demo": "tsx scripts/sdk_demo.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0"
+  }
+}

@@ -1,0 +1,7 @@
+[toolchain]
+# odra-macros uses `#![feature(box_patterns, result_flattening)]`, which requires
+# the nightly channel. Pinning here makes `cargo build`/`cargo check` reproducible
+# for the Casper (Odra) contract suite without a manual `+nightly`.
+channel = "nightly"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown"]

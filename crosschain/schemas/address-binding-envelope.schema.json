@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cred402.dev/schemas/address-binding-envelope.schema.json",
+  "title": "Cred402AddressBinding",
+  "type": "object",
+  "required": ["type", "version", "agent_id", "casper_account", "external_chain", "external_address", "nonce", "expires_at"],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "Cred402AddressBinding" },
+    "version": { "const": "1" },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "casper_account": { "type": "string", "pattern": "^0[12][0-9a-fA-F]+$" },
+    "external_chain": { "type": "string", "description": "CAIP-2 chain id, e.g. eip155:8453" },
+    "external_address": { "type": "string" },
+    "nonce": { "type": "string" },
+    "expires_at": { "type": "integer", "minimum": 0 },
+    "casper_signature": { "type": "string" },
+    "external_signature": { "type": "string" }
+  }
+}
