@@ -17,3 +17,5 @@ publ/
 # Rust/build artifacts anywhere
 **/target/
 *.tsbuildinfo
+# Demo recording source (keep the committed mp4, not the raw webm)
+media/*.webm

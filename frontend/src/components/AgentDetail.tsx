@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAgentProfile, getPeerBenchmark, getCreditHistory, getScoreTrend, getAgentHealth, fmtCspr, fmtTime, type AgentProfile, type PeerBenchmark, type CreditHistory, type ScoreTrend, type AgentHealthBadge } from "../api";
+import { getAgentProfile, getPeerBenchmark, getCreditHistory, getScoreTrend, getAgentHealth, getSimilarAgents, fmtCspr, fmtTime, type AgentProfile, type PeerBenchmark, type CreditHistory, type ScoreTrend, type AgentHealthBadge, type SimilarAgent } from "../api";
 import { CreditReportView } from "./CreditReportView";
 import { Sparkline } from "./Sparkline";
 
@@ -14,11 +14,13 @@ export function AgentDetail({ agentId, onClose }: { agentId: string; onClose: ()
   const [history, setHistory] = useState<CreditHistory | null>(null);
   const [trend, setTrend] = useState<ScoreTrend | null>(null);
   const [health, setHealth] = useState<AgentHealthBadge | null>(null);
+  const [similar, setSimilar] = useState<SimilarAgent[]>([]);
   const [view, setView] = useState<"profile" | "report" | "history">("profile");
 
   useEffect(() => {
     getAgentProfile(agentId).then(setP).catch(() => setP({ error: "load failed" }));
     getAgentHealth(agentId).then((h) => setHealth("error" in h ? null : h)).catch(() => setHealth(null));
+    getSimilarAgents(agentId).then((s) => setSimilar("error" in s ? [] : s.alternatives)).catch(() => setSimilar([]));
     getPeerBenchmark(agentId)
       .then((b) => setBench("error" in b ? null : b))
       .catch(() => setBench(null));
@@ -139,6 +141,18 @@ export function AgentDetail({ agentId, onClose }: { agentId: string; onClose: ()
                 <BenchRow label="Reputation" m={bench.reputation} />
                 <BenchRow label="Credit score" m={bench.credit_score} />
                 <BenchRow label="Fraud (lower better)" m={bench.fraud_score} />
+              </Section>
+            )}
+
+            {similar.length > 0 && (
+              <Section title="Similar agents (you might also consider)">
+                {similar.slice(0, 5).map((a) => (
+                  <div key={a.agent_id} className="rowline">
+                    <b>{a.agent_id}</b>
+                    <span className={`chip ${["gold", "platinum", "diamond"].includes(a.tier) ? "ok" : ""}`}>{a.tier}</span>
+                    <span className="muted">similarity {(a.similarity * 100).toFixed(0)}% · discovery {a.discovery_score} · rep {a.reputation}</span>
+                  </div>
+                ))}
               </Section>
             )}
 

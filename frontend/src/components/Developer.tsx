@@ -1,20 +1,63 @@
 import { useEffect, useState } from "react";
 import {
-  listApiKeys, createApiKey, listWebhooks, createWebhook, runGraphQL,
-  type ApiKeyMeta, type WebhookMeta,
+  listApiKeys, createApiKey, listWebhooks, createWebhook, runGraphQL, getProtocolConfig, fmtCspr,
+  type ApiKeyMeta, type WebhookMeta, type ProtocolConfig,
 } from "../api";
 
 /**
- * Developer portal — manage production API keys + webhooks (the /v1/admin surface)
- * and run live GraphQL queries. The console talks to the real gateway, so keys
- * minted here authenticate real /v1 requests and webhooks really fire.
+ * Developer portal — manage production API keys + webhooks (the /v1/admin surface),
+ * run live GraphQL queries, and read the protocol rulebook. The console talks to the
+ * real gateway, so keys minted here authenticate real /v1 requests and webhooks fire.
  */
 export function Developer() {
   return (
     <div className="pool">
+      <ProtocolRulebook />
       <ApiKeys />
       <Webhooks />
       <GraphQLConsole />
+    </div>
+  );
+}
+
+function ProtocolRulebook() {
+  const [cfg, setCfg] = useState<ProtocolConfig | null>(null);
+  useEffect(() => {
+    getProtocolConfig().then(setCfg).catch(() => setCfg(null));
+  }, []);
+  if (!cfg) return null;
+  return (
+    <div className="card wide">
+      <h3>Protocol rulebook <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>· policy {cfg.policy_version} · GET /v1/config</span></h3>
+      <div className="stat-row">
+        <Stat label="Facilitator fee" value={`${(cfg.fees.facilitator_fee_bps / 100).toFixed(2)}%`} />
+        <Stat label="Origination fee" value={`${(cfg.fees.origination_fee_bps / 100).toFixed(2)}%`} />
+        <Stat label="Interest → protocol" value={`${(cfg.fees.interest_spread_bps / 100).toFixed(0)}%`} />
+        <Stat label="Min reputation" value={`${cfg.governance.min_reputation_to_draw}`} />
+        <Stat label="Max exposure" value={`${fmtCspr(cfg.governance.max_agent_exposure_motes, 0)} CSPR`} />
+      </div>
+      <table className="table">
+        <thead><tr><th>Tier</th><th>Min reputation</th><th>Credit multiplier</th><th>Origination discount</th></tr></thead>
+        <tbody>
+          {cfg.reputation_tiers.map((t) => (
+            <tr key={t.tier}>
+              <td><span className={`chip ${["gold", "platinum", "diamond"].includes(t.tier) ? "ok" : ""}`}>{t.tier}</span></td>
+              <td>{t.min_reputation}</td>
+              <td>×{t.credit_multiplier}</td>
+              <td>{t.origination_discount_bps} bps</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
     </div>
   );
 }

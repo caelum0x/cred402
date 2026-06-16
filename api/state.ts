@@ -45,6 +45,7 @@ import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
 import { buildProtocolConfig } from "../lib/services/protocol_config.js";
+import { findSimilarAgents } from "../lib/services/similar_agents.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -296,6 +297,10 @@ export class ServerState {
   /** Self-documenting protocol config: fees, credit gates, reputation-tier perks. */
   protocolConfig() {
     return buildProtocolConfig(this.ledger);
+  }
+  /** Comparable alternative agents for a given agent ("you might also consider"). */
+  similarAgents(agentId: string, limit?: number) {
+    return findSimilarAgents(this.ledger, this.attestations, agentId, limit);
   }
   /** Issue a sign-in challenge for a Casper account to sign in its wallet. */
   walletChallenge(account: string) {

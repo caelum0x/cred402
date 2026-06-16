@@ -6,7 +6,7 @@
 
 **Agents earn anywhere. Casper decides who is creditworthy.**
 
-[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402.onrender.com/v1/health) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
+[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
 
 </div>
 
@@ -156,6 +156,14 @@ The `RiskPolicyManager` is **upgradable**: the policy hot-swaps v1 → v2 (adds 
 - **Accountability** — WatchdogAgent → DisputeCourt → SlashingVault; fraud graph gates underwriting.
 
 See [`SECURITY.md`](SECURITY.md). This is hackathon/research software — do not use with real funds or real KYC/lending without an audit.
+
+## Demo video
+
+A screen recording of the **live** console driving the full loop — agents, x402
+receipts, RWA evidence, credit pool, RealFi, and the Casper streaming-events feed
+updating in real time — is at [`media/cred402-demo.mp4`](media/cred402-demo.mp4).
+Regenerate it any time with `npm run record:demo` (Playwright records the live
+site → ffmpeg muxes to MP4).
 
 ## Demo in 90 seconds
 

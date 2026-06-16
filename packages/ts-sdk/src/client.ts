@@ -150,6 +150,10 @@ export class Cred402Client {
   agentHealth(agent_id: string): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/health`);
   }
+  similarAgents(agent_id: string, limit?: number): Promise<unknown> {
+    const suffix = limit !== undefined ? `?limit=${limit}` : "";
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/similar${suffix}`);
+  }
   creditCost(agent_id: string, draw_cspr: number): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/credit-cost?draw_cspr=${draw_cspr}`);
   }

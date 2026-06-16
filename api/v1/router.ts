@@ -207,6 +207,7 @@ export class V1Router {
       R("GET", "v1/agents/:id/score-trend", "read", ({ params }) => s.scoreTrend(params.id!)) ??
       R("GET", "v1/agents/:id/multichain", "read", ({ params }) => s.agentMultichain(params.id!)) ??
       R("GET", "v1/agents/:id/health", "read", ({ params }) => s.agentHealth(params.id!)) ??
+      R("GET", "v1/agents/:id/similar", "read", ({ params, url }) => s.similarAgents(params.id!, numParam(url, "limit"))) ??
       R("POST", "v1/attestations", "write", ({ body }) => {
         const b = parse(v.object({ from: v.string({ min: 2 }), to: v.string({ min: 2 }), note: v.withDefault(v.string({ max: 200 }), "") }), body);
         return s.attest(b.from, b.to, b.note);

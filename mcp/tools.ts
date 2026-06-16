@@ -26,6 +26,7 @@ import { buildReputationMovers } from "../lib/services/reputation_movers.js";
 import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
 import { buildProtocolConfig } from "../lib/services/protocol_config.js";
+import { findSimilarAgents } from "../lib/services/similar_agents.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { ProtocolEconomics as ProtocolEconomicsForCost } from "../lib/core/economics.js";
@@ -440,6 +441,12 @@ export const TOOLS: ToolDef[] = [
     description: "Itemize the full cost of a specific draw against an agent's line: upfront origination fee, prorated interest over the term, total repayment and effective all-in cost.",
     inputSchema: { type: "object", properties: { agent_id: str("agent id"), draw_cspr: num("draw amount in CSPR") }, required: ["agent_id", "draw_cspr"] },
     handler: (a, econ) => jsonSafe(computeCreditCost(econ.ledger, new ProtocolEconomicsForCost(), String(a.agent_id), Number(a.draw_cspr))),
+  },
+  {
+    name: "cred402.similar_agents",
+    description: "Comparable alternative agents for a given agent ('you might also consider'): same service category, ranked by closeness in standing and overall strength.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), limit: num("max alternatives") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(findSimilarAgents(econ.ledger, trustGraph(econ), String(a.agent_id), a.limit !== undefined ? Number(a.limit) : undefined)),
   },
   {
     name: "cred402.agent_health",

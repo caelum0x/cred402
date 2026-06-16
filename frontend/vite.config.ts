@@ -11,6 +11,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": { target: API, changeOrigin: true },
+      "/v1": { target: API, changeOrigin: true },
+      "/graphql": { target: API, changeOrigin: true },
+      "/report": { target: API, changeOrigin: true },
+      "/metrics": { target: API, changeOrigin: true },
       "/verify": { target: API, changeOrigin: true },
     },
   },

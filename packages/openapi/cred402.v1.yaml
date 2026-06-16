@@ -348,6 +348,26 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/agents/{id}/similar:
+    get:
+      tags: [Agents]
+      operationId: getSimilarAgents
+      summary: Comparable alternative agents
+      description: "'You might also consider' — same-category peers ranked by closeness in standing (reputation + credit) and overall discovery strength. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 5, maximum: 50 } }
+      responses:
+        "200":
+          description: Similar agents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/agents/{id}/health:
     get:
       tags: [Agents]

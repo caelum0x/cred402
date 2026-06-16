@@ -917,6 +917,35 @@ export async function getDisputeStats(): Promise<DisputeStats> {
   return ((await res.json()) as { data: DisputeStats }).data;
 }
 
+export interface ProtocolConfig {
+  policy_version: string;
+  fees: { facilitator_fee_bps: number; origination_fee_bps: number; interest_spread_bps: number; late_fee_bps: number };
+  governance: { origination_fee_bps: number; min_reputation_to_draw: number; max_agent_exposure_motes: string };
+  reputation_tiers: { tier: string; min_reputation: number; credit_multiplier: number; origination_discount_bps: number }[];
+  units: { motes_per_cspr: number };
+}
+
+export async function getProtocolConfig(): Promise<ProtocolConfig> {
+  const res = await fetch("/v1/config");
+  if (!res.ok) throw new Error(`config failed: ${res.status}`);
+  return ((await res.json()) as { data: ProtocolConfig }).data;
+}
+
+export interface SimilarAgent {
+  agent_id: string;
+  similarity: number;
+  discovery_score: number;
+  reputation: number;
+  credit_score: number;
+  tier: string;
+}
+
+export async function getSimilarAgents(agentId: string): Promise<{ alternatives: SimilarAgent[] } | { error: string }> {
+  const res = await fetch(`/v1/agents/${encodeURIComponent(agentId)}/similar`);
+  if (!res.ok) throw new Error(`similar failed: ${res.status}`);
+  return ((await res.json()) as { data: { alternatives: SimilarAgent[] } | { error: string } }).data;
+}
+
 const MOTES = 1_000_000_000;
 export function fmtCspr(motes: string | number, decimals = 3): string {
   const n = Number(motes) / MOTES;

@@ -37,6 +37,7 @@ export interface GraphQLDataSource {
   scoreTrend(agentId: string): unknown;
   agentMultichain(agentId: string): unknown;
   agentHealth(agentId: string): unknown;
+  similarAgents(agentId: string, limit?: number): unknown;
   creditCost(agentId: string, drawCspr: number): unknown;
   onboardingScorecard(agentId: string): unknown;
   riskAlerts(): unknown;
@@ -121,6 +122,7 @@ export function makeRoot(src: GraphQLDataSource) {
     scoreTrend: ({ agentId }: { agentId: string }) => src.scoreTrend(agentId),
     agentMultichain: ({ agentId }: { agentId: string }) => src.agentMultichain(agentId),
     agentHealth: ({ agentId }: { agentId: string }) => src.agentHealth(agentId),
+    similarAgents: ({ agentId, limit }: { agentId: string; limit?: number }) => src.similarAgents(agentId, limit),
     creditCost: ({ agentId, draw_cspr }: { agentId: string; draw_cspr: number }) => src.creditCost(agentId, draw_cspr),
     readiness: ({ agentId }: { agentId: string }) => src.onboardingScorecard(agentId),
     riskAlerts: () => src.riskAlerts(),

@@ -87,6 +87,7 @@ export const schema = buildSchema(/* GraphQL */ `
     scoreTrend(agentId: ID!): JSON
     agentMultichain(agentId: ID!): JSON
     agentHealth(agentId: ID!): JSON
+    similarAgents(agentId: ID!, limit: Int): JSON
     creditCost(agentId: ID!, draw_cspr: Float!): JSON
     readiness(agentId: ID!): JSON
     riskAlerts: JSON!
