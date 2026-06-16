@@ -74,6 +74,9 @@ export class Cred402Client {
   explainCredit(id: string): Promise<CreditExplain> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(id)}/credit-explain`);
   }
+  registerAgents(agents: Array<{ agent_id: string; service_type: ServiceType }>): Promise<unknown> {
+    return this.request("POST", "/v1/agents/batch", { agents });
+  }
   registerAgent(agent_id: string, service_type: ServiceType, agent_public_key?: string): Promise<unknown> {
     return this.request("POST", "/v1/agents", { agent_id, service_type, agent_public_key }, agent_id);
   }

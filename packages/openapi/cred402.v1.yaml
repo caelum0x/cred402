@@ -92,6 +92,40 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/agents/batch:
+    post:
+      tags: [Agents]
+      operationId: registerAgents
+      summary: Register a batch of agents
+      description: "Register up to 100 agents in one call (operator fleet onboarding); returns per-item ok/error so a duplicate doesn't abort the batch. **Requires `write` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agents]
+              properties:
+                agents:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    required: [agent_id, service_type]
+                    properties:
+                      agent_id: { type: string }
+                      service_type: { type: string }
+      responses:
+        "200":
+          description: Per-item registration results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/agents:
     get:
       tags: [Agents]

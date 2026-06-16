@@ -161,7 +161,18 @@ See [`SECURITY.md`](SECURITY.md). This is hackathon/research software — do not
 
 A screen recording of the **live** console driving the full loop — agents, x402
 receipts, RWA evidence, credit pool, RealFi, and the Casper streaming-events feed
-updating in real time — is at [`media/cred402-demo.mp4`](media/cred402-demo.mp4).
+updating in real time.
+
+<div align="center">
+
+<video src="https://github.com/caelum0x/cred402/raw/main/media/cred402-demo.mp4" controls muted width="800"></video>
+
+[![Watch the Cred402 demo](media/cred402-demo-poster.png)](https://github.com/caelum0x/cred402/raw/main/media/cred402-demo.mp4)
+
+*▶ [Watch the 48-second demo](https://github.com/caelum0x/cred402/raw/main/media/cred402-demo.mp4) — or [`media/cred402-demo.mp4`](media/cred402-demo.mp4)*
+
+</div>
+
 Regenerate it any time with `npm run record:demo` (Playwright records the live
 site → ffmpeg muxes to MP4).
 

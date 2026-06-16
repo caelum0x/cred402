@@ -232,6 +232,38 @@ export class V1Router {
         s.ledger.agents.register_agent(a);
         return s.ledger.buildPassport(a.agent_id);
       }) ??
+      R("POST", "v1/agents/batch", "write", ({ body }) => {
+        const b = parse(
+          v.object({
+            agents: v.array(
+              v.object({
+                agent_id: v.string({ min: 2, max: 64 }),
+                service_type: v.literalUnion(
+                  "solar_output_verification",
+                  "weather_risk",
+                  "receivable_quality",
+                  "risk_scoring",
+                  "treasury_routing",
+                  "monitoring",
+                ),
+                agent_public_key: v.withDefault(v.string({ max: 130 }), "01"),
+                owner_public_key: v.withDefault(v.string({ max: 130 }), "01"),
+              }),
+              { max: 100 },
+            ),
+          }),
+          body,
+        );
+        const results = b.agents.map((a) => {
+          try {
+            s.ledger.agents.register_agent(a);
+            return { agent_id: a.agent_id, ok: true };
+          } catch (err) {
+            return { agent_id: a.agent_id, ok: false, error: (err as Error).message };
+          }
+        });
+        return { registered: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok).length, results };
+      }) ??
       R("GET", "v1/receipts", "read", ({ url }) => {
         let list = s.ledger.receipts.list();
         const status = url.searchParams.get("status");
