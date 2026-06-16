@@ -44,6 +44,7 @@ import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
+import { buildProtocolConfig } from "../lib/services/protocol_config.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -291,6 +292,10 @@ export class ServerState {
   /** x402 receipt-network statistics (volume, settlement, top counterparties). */
   x402Stats() {
     return buildX402Stats(this.ledger);
+  }
+  /** Self-documenting protocol config: fees, credit gates, reputation-tier perks. */
+  protocolConfig() {
+    return buildProtocolConfig(this.ledger);
   }
   /** Issue a sign-in challenge for a Casper account to sign in its wallet. */
   walletChallenge(account: string) {

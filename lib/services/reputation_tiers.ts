@@ -20,8 +20,10 @@ export interface TierInfo {
 }
 
 const ORDER: Tier[] = ["unrated", "bronze", "silver", "gold", "platinum", "diamond"];
-const THRESHOLDS: Record<Tier, number> = { unrated: 0, bronze: 40, silver: 60, gold: 75, platinum: 88, diamond: 96 };
-const PERKS: Record<Tier, { mult: number; discount: number }> = {
+export const TIER_ORDER: readonly Tier[] = ORDER;
+export const TIER_THRESHOLDS: Record<Tier, number> = { unrated: 0, bronze: 40, silver: 60, gold: 75, platinum: 88, diamond: 96 };
+const THRESHOLDS = TIER_THRESHOLDS;
+export const TIER_PERKS: Record<Tier, { mult: number; discount: number }> = {
   unrated: { mult: 1.0, discount: 0 },
   bronze: { mult: 1.0, discount: 0 },
   silver: { mult: 1.05, discount: 5 },
@@ -29,6 +31,7 @@ const PERKS: Record<Tier, { mult: number; discount: number }> = {
   platinum: { mult: 1.18, discount: 20 },
   diamond: { mult: 1.25, discount: 30 },
 };
+const PERKS = TIER_PERKS;
 
 export function computeTier(ledger: Ledger, agentId: string): TierInfo | { error: string } {
   const agent = ledger.agents.get(agentId);

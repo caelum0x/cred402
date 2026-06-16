@@ -108,6 +108,7 @@ export class V1Router {
 
     return (
       R("GET", "v1/health", "read", () => ({ ok: true, env: this.gateway.config.env, policy: s.ledger.policy.version() })) ??
+      R("GET", "v1/config", "read", () => s.protocolConfig()) ??
       R("POST", "v1/auth/wallet/challenge", "read", ({ body }) => {
         const b = parse(v.object({ account: v.string({ min: 66, max: 66 }) }), body);
         return s.walletChallenge(b.account);
