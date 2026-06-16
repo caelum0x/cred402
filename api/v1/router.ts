@@ -138,6 +138,11 @@ export class V1Router {
       R("GET", "v1/agents/:id", "read", ({ params }) => required(s.ledger.agents.get(params.id!), "agent")) ??
       R("GET", "v1/agents/:id/passport", "read", ({ params }) => required(s.ledger.buildPassport(params.id!), "agent")) ??
       R("GET", "v1/agents/:id/credit-line", "read", ({ params }) => required(s.ledger.pool.get(params.id!), "credit line")) ??
+      R("GET", "v1/agents/:id/credit-cost", "read", ({ params, url }) => {
+        const draw = numParam(url, "draw_cspr");
+        if (draw === undefined) throw new ApiError(400, "bad_request", "draw_cspr query parameter required");
+        return s.creditCost(params.id!, draw);
+      }) ??
       R("GET", "v1/agents/:id/credit-explain", "read", ({ params }) => s.creditExplain(params.id!)) ??
       R("GET", "v1/compliance/agents/:id", "read", ({ params }) => s.complianceScreen(params.id!)) ??
       R("GET", "v1/compliance/report", "read", () => s.complianceReport()) ??
@@ -183,6 +188,8 @@ export class V1Router {
       }) ??
       R("GET", "v1/analytics/categories", "read", () => s.categoryAnalytics()) ??
       R("GET", "v1/analytics/reputation-movers", "read", ({ url }) => s.reputationMovers(numParam(url, "limit"))) ??
+      R("GET", "v1/analytics/disputes", "read", () => s.disputeStats()) ??
+      R("GET", "v1/analytics/x402", "read", () => s.x402Stats()) ??
       R("GET", "v1/discovery", "read", ({ url }) =>
         s.discover({
           service_type: url.searchParams.get("service_type") ?? undefined,

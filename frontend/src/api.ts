@@ -899,6 +899,24 @@ export async function getAgentHealth(agentId: string): Promise<AgentHealthBadge 
   return body.data;
 }
 
+export interface DisputeStats {
+  total: number;
+  open: number;
+  resolved: number;
+  by_verdict: Record<string, number>;
+  by_type: Record<string, number>;
+  total_slashed_motes: string;
+  resolution_rate: number;
+  agent_loss_rate: number;
+  most_disputed_agent: { agent_id: string; disputes: number } | null;
+}
+
+export async function getDisputeStats(): Promise<DisputeStats> {
+  const res = await fetch("/v1/analytics/disputes");
+  if (!res.ok) throw new Error(`dispute stats failed: ${res.status}`);
+  return ((await res.json()) as { data: DisputeStats }).data;
+}
+
 const MOTES = 1_000_000_000;
 export function fmtCspr(motes: string | number, decimals = 3): string {
   const n = Number(motes) / MOTES;

@@ -13,6 +13,8 @@ export interface GraphQLDataSource {
   analytics(): unknown;
   categoryAnalytics(): unknown;
   reputationMovers(limit?: number): unknown;
+  disputeStats(): unknown;
+  x402Stats(): unknown;
   search(q: string): unknown;
   notifications(): unknown;
   timeseries(): unknown;
@@ -34,6 +36,7 @@ export interface GraphQLDataSource {
   scoreTrend(agentId: string): unknown;
   agentMultichain(agentId: string): unknown;
   agentHealth(agentId: string): unknown;
+  creditCost(agentId: string, drawCspr: number): unknown;
   onboardingScorecard(agentId: string): unknown;
   riskAlerts(): unknown;
   yieldProjection(): unknown;
@@ -100,6 +103,8 @@ export function makeRoot(src: GraphQLDataSource) {
     analytics: () => src.analytics(),
     categoryAnalytics: () => src.categoryAnalytics(),
     reputationMovers: ({ limit }: { limit?: number }) => src.reputationMovers(limit),
+    disputeStats: () => src.disputeStats(),
+    x402Stats: () => src.x402Stats(),
     timeseries: () => src.timeseries(),
     notifications: () => src.notifications(),
     search: ({ q }: { q: string }) => src.search(q),
@@ -114,6 +119,7 @@ export function makeRoot(src: GraphQLDataSource) {
     scoreTrend: ({ agentId }: { agentId: string }) => src.scoreTrend(agentId),
     agentMultichain: ({ agentId }: { agentId: string }) => src.agentMultichain(agentId),
     agentHealth: ({ agentId }: { agentId: string }) => src.agentHealth(agentId),
+    creditCost: ({ agentId, draw_cspr }: { agentId: string; draw_cspr: number }) => src.creditCost(agentId, draw_cspr),
     readiness: ({ agentId }: { agentId: string }) => src.onboardingScorecard(agentId),
     riskAlerts: () => src.riskAlerts(),
     yieldProjection: () => src.yieldProjection(),

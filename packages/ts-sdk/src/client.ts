@@ -147,6 +147,9 @@ export class Cred402Client {
   agentHealth(agent_id: string): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/health`);
   }
+  creditCost(agent_id: string, draw_cspr: number): Promise<unknown> {
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/credit-cost?draw_cspr=${draw_cspr}`);
+  }
   simulateCredit(input: { monthly_revenue_cspr: number; reputation?: number; stake_cspr?: number; accuracy?: number; dispute_rate?: number; jobs_completed?: number; service_type?: string }): Promise<unknown> {
     return this.request("POST", "/v1/credit/simulate", input);
   }
@@ -180,6 +183,12 @@ export class Cred402Client {
   reputationMovers(limit?: number): Promise<unknown> {
     const suffix = limit !== undefined ? `?limit=${limit}` : "";
     return this.request("GET", `/v1/analytics/reputation-movers${suffix}`);
+  }
+  disputeStats(): Promise<unknown> {
+    return this.request("GET", "/v1/analytics/disputes");
+  }
+  x402Stats(): Promise<unknown> {
+    return this.request("GET", "/v1/analytics/x402");
   }
   notifications(): Promise<unknown[]> {
     return this.request("GET", "/v1/notifications");

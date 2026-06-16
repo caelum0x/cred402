@@ -223,6 +223,44 @@ impl Client {
     pub fn portfolio(&self) -> Result<Value, Cred402Error> {
         self.get("/v1/credit/portfolio")
     }
+    /// Side-by-side comparison of two agents.
+    pub fn compare_agents(&self, a: &str, b: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!(
+            "/v1/agents/compare?a={}&b={}",
+            urlencode(a),
+            urlencode(b)
+        ))
+    }
+    /// An agent's green/amber/red health badge.
+    pub fn agent_health(&self, agent_id: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!("/v1/agents/{}/health", agent_id))
+    }
+    /// Itemized cost of a specific draw against an agent's line.
+    pub fn credit_cost(&self, agent_id: &str, draw_cspr: f64) -> Result<Value, Cred402Error> {
+        self.get(&format!(
+            "/v1/agents/{}/credit-cost?draw_cspr={}",
+            agent_id, draw_cspr
+        ))
+    }
+    /// Market intelligence aggregated by service category.
+    pub fn category_analytics(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/analytics/categories")
+    }
+    /// Biggest reputation gainers and losers.
+    pub fn reputation_movers(&self, limit: Option<u32>) -> Result<Value, Cred402Error> {
+        match limit {
+            Some(n) => self.get(&format!("/v1/analytics/reputation-movers?limit={}", n)),
+            None => self.get("/v1/analytics/reputation-movers"),
+        }
+    }
+    /// Protocol-level dispute statistics.
+    pub fn dispute_stats(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/analytics/disputes")
+    }
+    /// x402 receipt-network statistics.
+    pub fn x402_stats(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/analytics/x402")
+    }
     /// Percentile benchmark of an agent against its service-type cohort.
     pub fn benchmark(&self, agent_id: &str) -> Result<Value, Cred402Error> {
         self.get(&format!("/v1/agents/{}/benchmark", agent_id))

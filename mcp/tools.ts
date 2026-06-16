@@ -23,7 +23,11 @@ import { buildAgentMultichainSummary } from "../lib/services/agent_multichain.js
 import { compareAgents } from "../lib/services/agent_compare.js";
 import { buildCategoryAnalytics } from "../lib/services/category_analytics.js";
 import { buildReputationMovers } from "../lib/services/reputation_movers.js";
+import { buildDisputeStats } from "../lib/services/dispute_stats.js";
+import { buildX402Stats } from "../lib/services/x402_stats.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
+import { computeCreditCost } from "../lib/services/credit_cost.js";
+import { ProtocolEconomics as ProtocolEconomicsForCost } from "../lib/core/economics.js";
 
 /**
  * Cred402 MCP tool registry (p2 §12).
@@ -431,10 +435,28 @@ export const TOOLS: ToolDef[] = [
     handler: (a, econ) => jsonSafe(buildAgentMultichainSummary(econ.ledger, String(a.agent_id))),
   },
   {
+    name: "cred402.credit_cost",
+    description: "Itemize the full cost of a specific draw against an agent's line: upfront origination fee, prorated interest over the term, total repayment and effective all-in cost.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), draw_cspr: num("draw amount in CSPR") }, required: ["agent_id", "draw_cspr"] },
+    handler: (a, econ) => jsonSafe(computeCreditCost(econ.ledger, new ProtocolEconomicsForCost(), String(a.agent_id), Number(a.draw_cspr))),
+  },
+  {
     name: "cred402.agent_health",
     description: "A glanceable green/amber/red health verdict for an agent (worst-of reputation, fraud risk, open disputes and credit-line status) with a composite score and the driving factors.",
     inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
     handler: (a, econ) => jsonSafe(buildAgentHealthBadge(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.x402_stats",
+    description: "x402 receipt-network analytics (Product B): total volume, settlement status breakdown, finalization rate, top sellers/payers, and per-service volume.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildX402Stats(econ.ledger)),
+  },
+  {
+    name: "cred402.dispute_stats",
+    description: "Protocol-level dispute intelligence: totals, open/resolved, outcomes by verdict and type, total slashed, resolution and agent-loss rates, and the most-disputed agent.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildDisputeStats(econ.ledger)),
   },
   {
     name: "cred402.reputation_movers",

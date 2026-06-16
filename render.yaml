@@ -1,0 +1,30 @@
+# Render Blueprint for the Cred402 API (the always-on backend the Vercel console
+# talks to). Render runs long-lived processes, so the node:http server + SSE event
+# stream + in-memory ledger work as-is — unlike serverless.
+#
+# Deploy: Render dashboard → New → Blueprint → connect caelum0x/cred402 → Apply.
+# The service name `cred402-api` → https://cred402-api.onrender.com (pre-wired in
+# the Vercel rewrites). No secrets required for sim mode; add the p8–p10 keys as
+# environment variables to enable the live Testnet / Stripe / Plaid paths.
+services:
+  - type: web
+    name: cred402-api
+    runtime: node
+    region: oregon
+    plan: free
+    # tsx + typescript live in devDependencies, so install them too (Render sets
+    # NODE_ENV=production, which would otherwise skip dev deps).
+    buildCommand: npm install --include=dev
+    startCommand: npm start
+    healthCheckPath: /v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # The API already honors the platform PORT; pin a data dir for the journal.
+      - key: CRED402_DATA_DIR
+        value: /tmp/cred402
+      # Sim/free mode by default. Set these in the Render dashboard to go live:
+      #   CRED402_CHAIN=testnet, CRED402_NODE, CRED402_SECRET_KEY,
+      #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PLAID_CLIENT_ID, PLAID_SECRET,
+      #   CRED402_X402_FACILITATOR_URL, CRED402_SIDECAR_URL

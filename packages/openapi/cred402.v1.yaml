@@ -312,6 +312,26 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/agents/{id}/credit-cost:
+    get:
+      tags: [Credit]
+      operationId: getCreditCost
+      summary: Itemized cost of a draw
+      description: "The full cost of a specific draw against the agent's line: upfront origination fee, prorated interest over the term, total repayment and effective all-in cost. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - { name: draw_cspr, in: query, required: true, schema: { type: number }, description: Draw amount in CSPR. }
+      responses:
+        "200":
+          description: Cost breakdown.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/agents/{id}/health:
     get:
       tags: [Agents]
@@ -433,6 +453,40 @@ paths:
       responses:
         "200":
           description: Category analytics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics/x402:
+    get:
+      tags: [Analytics]
+      operationId: getX402Stats
+      summary: x402 receipt-network statistics
+      description: "Analytics for the x402 receipt network (Product B): total volume, settlement-status breakdown, finalization rate, top sellers/payers, and per-service volume. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: x402 network statistics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics/disputes:
+    get:
+      tags: [Analytics]
+      operationId: getDisputeStats
+      summary: Protocol dispute statistics
+      description: "Protocol-level dispute intelligence: totals, open/resolved, outcomes by verdict and type, total slashed, resolution and agent-loss rates, and the most-disputed agent. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Dispute statistics.
           content:
             application/json:
               schema:

@@ -443,6 +443,84 @@ func (c *Client) AcceptCreditOffer(ctx context.Context, offerID, idempotencyKey 
 	return out, nil
 }
 
+// AgentBenchmark returns an agent's percentile vs its service-type cohort.
+func (c *Client) AgentBenchmark(ctx context.Context, agentID string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/agents/"+pathEscape(agentID)+"/benchmark", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AgentHealth returns an agent's green/amber/red health badge.
+func (c *Client) AgentHealth(ctx context.Context, agentID string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/agents/"+pathEscape(agentID)+"/health", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CompareAgents returns a side-by-side comparison of two agents.
+func (c *Client) CompareAgents(ctx context.Context, a, b string) (map[string]any, error) {
+	var out map[string]any
+	path := "/v1/agents/compare?a=" + url.QueryEscape(a) + "&b=" + url.QueryEscape(b)
+	if err := c.do(ctx, http.MethodGet, path, nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreditCost itemizes the cost of a specific draw against an agent's line.
+func (c *Client) CreditCost(ctx context.Context, agentID string, drawCSPR float64) (map[string]any, error) {
+	var out map[string]any
+	path := "/v1/agents/" + pathEscape(agentID) + "/credit-cost?draw_cspr=" + strconv.FormatFloat(drawCSPR, 'f', -1, 64)
+	if err := c.do(ctx, http.MethodGet, path, nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CategoryAnalytics returns market intelligence aggregated by service category.
+func (c *Client) CategoryAnalytics(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/analytics/categories", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ReputationMovers returns the biggest reputation gainers and losers.
+func (c *Client) ReputationMovers(ctx context.Context, limit int) (map[string]any, error) {
+	var out map[string]any
+	path := "/v1/analytics/reputation-movers"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	if err := c.do(ctx, http.MethodGet, path, nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DisputeStats returns protocol-level dispute statistics.
+func (c *Client) DisputeStats(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/analytics/disputes", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// X402Stats returns x402 receipt-network statistics.
+func (c *Client) X402Stats(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/analytics/x402", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ---------------------------------------------------------------------------
 // Marketplace & economics
 // ---------------------------------------------------------------------------

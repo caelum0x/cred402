@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import type { Snapshot } from "../types";
-import { fmtCspr, fmtTime, resolveDispute } from "../api";
+import { fmtCspr, fmtTime, resolveDispute, getDisputeStats, type DisputeStats } from "../api";
 
 const VERDICT_CLASS: Record<string, string> = {
   agent_wins: "ok",
@@ -11,6 +12,10 @@ const VERDICT_CLASS: Record<string, string> = {
 
 export function Disputes({ snapshot, onChange }: { snapshot: Snapshot; onChange?: () => void }) {
   const disputes = [...snapshot.disputes].sort((a, b) => b.opened_at - a.opened_at);
+  const [stats, setStats] = useState<DisputeStats | null>(null);
+  useEffect(() => {
+    getDisputeStats().then(setStats).catch(() => setStats(null));
+  }, [snapshot.disputes.length, snapshot.slashes.length]);
   const totalSlashed = snapshot.slashes.reduce((s, x) => s + Number(x.amount), 0);
   const resolve = async (id: string, verdict: string, slash: number) => {
     await resolveDispute(id, verdict, slash);
@@ -25,6 +30,26 @@ export function Disputes({ snapshot, onChange }: { snapshot: Snapshot; onChange?
         <Stat label="Total slashed" value={`${fmtCspr(totalSlashed)} CSPR`} />
         <Stat label="Insurance reserve" value={`${fmtCspr(snapshot.slashReserves.insurance_reserve ?? "0")} CSPR`} accent />
       </div>
+
+      {stats && stats.total > 0 && (
+        <div className="card wide">
+          <h3>Dispute statistics</h3>
+          <div className="stat-row">
+            <Stat label="Resolution rate" value={`${(stats.resolution_rate * 100).toFixed(0)}%`} />
+            <Stat label="Agent-loss rate" value={`${(stats.agent_loss_rate * 100).toFixed(0)}%`} danger={stats.agent_loss_rate > 0.5} />
+            <Stat label="Open" value={`${stats.open}`} danger={stats.open > 0} />
+            <Stat label="Most disputed" value={stats.most_disputed_agent ? `${stats.most_disputed_agent.agent_id} (${stats.most_disputed_agent.disputes})` : "—"} />
+          </div>
+          <div className="caps" style={{ marginTop: 6 }}>
+            {Object.entries(stats.by_verdict).map(([v, n]) => (
+              <span key={v} className={`chip ${VERDICT_CLASS[v] ?? ""}`}>{v}: {n}</span>
+            ))}
+            {Object.entries(stats.by_type).map(([t, n]) => (
+              <span key={t} className="chip">{t}: {n}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card wide">
         <h3>DisputeCourt</h3>

@@ -22,7 +22,8 @@ import type { CreditReport } from "../lib/services/credit_report.js";
  *   x402:   GET /verify/:evidence_type?rwa_id=SOLAR-A17
  *   Static: serves frontend/dist when built
  */
-const PORT = Number(process.env.CRED402_PORT ?? 4021);
+// Honor the platform-provided PORT (Render/Heroku/etc.), then CRED402_PORT, then default.
+const PORT = Number(process.env.PORT ?? process.env.CRED402_PORT ?? 4021);
 const FRONTEND_DIR = resolve(process.cwd(), "frontend", "dist");
 
 function json(res: ServerResponse, status: number, body: unknown): void {

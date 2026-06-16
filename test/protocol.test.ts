@@ -183,8 +183,8 @@ test("AgentPassport: aggregates profile + risk flags", () => {
   assert.equal(p.stake, cspr(50));
 });
 
-test("MCP tools: registry exposes 40 tools and they dispatch", () => {
-  assert.equal(TOOL_INDEX.size, 40);
+test("MCP tools: registry exposes 43 tools and they dispatch", () => {
+  assert.equal(TOOL_INDEX.size, 43);
   const econ = new Cred402Economy(new Ledger());
   econ.bootstrap();
   econ.createJob();

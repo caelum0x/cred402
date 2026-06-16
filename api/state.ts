@@ -41,6 +41,9 @@ import { compareAgents } from "../lib/services/agent_compare.js";
 import { buildCategoryAnalytics } from "../lib/services/category_analytics.js";
 import { buildReputationMovers } from "../lib/services/reputation_movers.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
+import { computeCreditCost } from "../lib/services/credit_cost.js";
+import { buildDisputeStats } from "../lib/services/dispute_stats.js";
+import { buildX402Stats } from "../lib/services/x402_stats.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -276,6 +279,18 @@ export class ServerState {
   /** Glanceable green/amber/red health verdict for an agent. */
   agentHealth(agentId: string) {
     return buildAgentHealthBadge(this.ledger, agentId);
+  }
+  /** Itemized cost of a specific draw against an agent's line. */
+  creditCost(agentId: string, drawCspr: number) {
+    return computeCreditCost(this.ledger, this.economics, agentId, drawCspr);
+  }
+  /** Protocol-level dispute statistics (outcomes, types, slashing). */
+  disputeStats() {
+    return buildDisputeStats(this.ledger);
+  }
+  /** x402 receipt-network statistics (volume, settlement, top counterparties). */
+  x402Stats() {
+    return buildX402Stats(this.ledger);
   }
   /** Issue a sign-in challenge for a Casper account to sign in its wallet. */
   walletChallenge(account: string) {
