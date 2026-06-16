@@ -3,7 +3,7 @@
 # stream + in-memory ledger work as-is — unlike serverless.
 #
 # Deploy: Render dashboard → New → Blueprint → connect caelum0x/cred402 → Apply.
-# Live at https://cred402.onrender.com (pre-wired in the Vercel rewrites). No
+# Live at https://cred402-1.onrender.com (pre-wired in the Vercel rewrites). No
 # secrets required for sim mode; add the p8–p10 keys as environment variables to
 # enable the live Testnet / Stripe / Plaid paths.
 services:

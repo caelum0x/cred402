@@ -6,7 +6,7 @@
 
 **Agents earn anywhere. Casper decides who is creditworthy.**
 
-[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
+[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402-1.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
 
 </div>
 
@@ -21,7 +21,7 @@ DeFi was built for wallets. Cred402 is built for **workers**: it turns agents fr
 | Surface | URL | Stack |
 | ------- | --- | ----- |
 | **Console** | https://cred402.vercel.app | Vite + React on Vercel |
-| **API** | https://cred402.onrender.com | `node:http` + SSE on Render |
+| **API** | https://cred402-1.onrender.com | `node:http` + SSE on Render |
 | **Repo** | https://github.com/caelum0x/cred402 | monorepo (TS · Rust · Go · Solidity · Python) |
 
 The console proxies `/api` + `/v1` to the API (same-origin via Vercel rewrites). The Render free instance cold-starts (~50 s) after idle.
