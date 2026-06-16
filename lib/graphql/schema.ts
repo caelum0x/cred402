@@ -75,6 +75,7 @@ export const schema = buildSchema(/* GraphQL */ `
     reputationMovers(limit: Int): JSON!
     disputeStats: JSON!
     x402Stats: JSON!
+    marketplaceStats: JSON!
     timeseries: JSON!
     notifications: [Notification!]!
     search(q: String!): [SearchResult!]!
@@ -85,10 +86,13 @@ export const schema = buildSchema(/* GraphQL */ `
     compareAgents(a: ID!, b: ID!): JSON
     creditHistory(agentId: ID!): JSON
     scoreTrend(agentId: ID!): JSON
+    reputationBreakdown(agentId: ID!): JSON
     agentMultichain(agentId: ID!): JSON
     agentHealth(agentId: ID!): JSON
+    agentDossier(agentId: ID!): JSON
     similarAgents(agentId: ID!, limit: Int): JSON
     creditCost(agentId: ID!, draw_cspr: Float!): JSON
+    safeDraw(agentId: ID!, target_hf_bps: Int): JSON
     readiness(agentId: ID!): JSON
     riskAlerts: JSON!
     yieldProjection: JSON!

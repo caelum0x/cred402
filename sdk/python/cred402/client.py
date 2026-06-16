@@ -64,6 +64,7 @@ class Cred402Client:
         self.realfi = _RealFi(self)
         self.compliance = _Compliance(self)
         self.discovery = _Discovery(self)
+        self.analytics = _Analytics(self)
         self.disputes = _Disputes(self)
         self.admin = _Admin(self)
         self.webhooks = _Webhooks(self)
@@ -240,6 +241,71 @@ class _Agents(_Resource):
     def history(self, agent_id: str) -> Dict[str, Any]:
         """GET /v1/agents/:id/history — the agent's chronological credit file."""
         return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/history")
+
+    def health(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/health — green/amber/red health badge."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/health")
+
+    def readiness(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/readiness — credit-qualification scorecard."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/readiness")
+
+    def score_trend(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/score-trend — credit-score & reputation trajectory."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/score-trend")
+
+    def multichain(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/multichain — cross-chain footprint."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/multichain")
+
+    def similar(self, agent_id: str, limit: Optional[int] = None) -> Dict[str, Any]:
+        """GET /v1/agents/:id/similar — comparable alternative agents."""
+        path = f"/v1/agents/{urllib.parse.quote(agent_id)}/similar"
+        if limit is not None:
+            path += f"?limit={limit}"
+        return self._c.request("GET", path)
+
+    def credit_cost(self, agent_id: str, draw_cspr: float) -> Dict[str, Any]:
+        """GET /v1/agents/:id/credit-cost — itemized cost of a specific draw."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/credit-cost?draw_cspr={draw_cspr}")
+
+    def compare(self, agent_a: str, agent_b: str) -> Dict[str, Any]:
+        """GET /v1/agents/compare — side-by-side comparison of two agents."""
+        return self._c.request(
+            "GET", f"/v1/agents/compare?a={urllib.parse.quote(agent_a)}&b={urllib.parse.quote(agent_b)}"
+        )
+
+    def register_batch(self, agents: List[Dict[str, str]]) -> Dict[str, Any]:
+        """POST /v1/agents/batch — register many agents in one call."""
+        return self._c.request("POST", "/v1/agents/batch", body={"agents": agents})
+
+
+class _Analytics(_Resource):
+    """Protocol-level analytics + market intelligence."""
+
+    def categories(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/analytics/categories")
+
+    def reputation_movers(self, limit: Optional[int] = None) -> Dict[str, Any]:
+        path = "/v1/analytics/reputation-movers"
+        if limit is not None:
+            path += f"?limit={limit}"
+        return self._c.request("GET", path)
+
+    def disputes(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/analytics/disputes")
+
+    def x402(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/analytics/x402")
+
+    def risk_alerts(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/risk/alerts")
+
+    def yield_projection(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/credit/yield-projection")
+
+    def config(self) -> Dict[str, Any]:
+        return self._c.request("GET", "/v1/config")
 
 
 class _Credit(_Resource):

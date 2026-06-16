@@ -139,6 +139,7 @@ export class V1Router {
       R("GET", "v1/agents/:id", "read", ({ params }) => required(s.ledger.agents.get(params.id!), "agent")) ??
       R("GET", "v1/agents/:id/passport", "read", ({ params }) => required(s.ledger.buildPassport(params.id!), "agent")) ??
       R("GET", "v1/agents/:id/credit-line", "read", ({ params }) => required(s.ledger.pool.get(params.id!), "credit line")) ??
+      R("GET", "v1/agents/:id/safe-draw", "read", ({ params, url }) => s.safeDraw(params.id!, numParam(url, "target_hf_bps"))) ??
       R("GET", "v1/agents/:id/credit-cost", "read", ({ params, url }) => {
         const draw = numParam(url, "draw_cspr");
         if (draw === undefined) throw new ApiError(400, "bad_request", "draw_cspr query parameter required");
@@ -158,6 +159,11 @@ export class V1Router {
       R("GET", "v1/credit/portfolio", "read", () => s.portfolioReport()) ??
       R("GET", "v1/risk/alerts", "read", () => s.riskAlerts()) ??
       R("GET", "v1/credit/yield-projection", "read", () => s.yieldProjection()) ??
+      R("GET", "v1/credit/lp-preview", "read", ({ url }) => {
+        const deposit = numParam(url, "deposit_cspr");
+        if (deposit === undefined) throw new ApiError(400, "bad_request", "deposit_cspr query parameter required");
+        return s.lpDepositPreview(deposit);
+      }) ??
       R("GET", "v1/credit/offers", "read", ({ url }) => s.listCreditOffers(url.searchParams.get("agent_id") ?? undefined)) ??
       R("POST", "v1/credit/offers", "write", ({ body }) => {
         const b = parse(
@@ -191,6 +197,7 @@ export class V1Router {
       R("GET", "v1/analytics/reputation-movers", "read", ({ url }) => s.reputationMovers(numParam(url, "limit"))) ??
       R("GET", "v1/analytics/disputes", "read", () => s.disputeStats()) ??
       R("GET", "v1/analytics/x402", "read", () => s.x402Stats()) ??
+      R("GET", "v1/analytics/marketplace", "read", () => s.marketplaceStats()) ??
       R("GET", "v1/discovery", "read", ({ url }) =>
         s.discover({
           service_type: url.searchParams.get("service_type") ?? undefined,
@@ -205,9 +212,11 @@ export class V1Router {
       R("GET", "v1/agents/:id/history", "read", ({ params }) => s.creditHistory(params.id!)) ??
       R("GET", "v1/agents/:id/readiness", "read", ({ params }) => s.onboardingScorecard(params.id!)) ??
       R("GET", "v1/agents/:id/score-trend", "read", ({ params }) => s.scoreTrend(params.id!)) ??
+      R("GET", "v1/agents/:id/reputation-breakdown", "read", ({ params }) => s.reputationBreakdown(params.id!)) ??
       R("GET", "v1/agents/:id/multichain", "read", ({ params }) => s.agentMultichain(params.id!)) ??
       R("GET", "v1/agents/:id/health", "read", ({ params }) => s.agentHealth(params.id!)) ??
       R("GET", "v1/agents/:id/similar", "read", ({ params, url }) => s.similarAgents(params.id!, numParam(url, "limit"))) ??
+      R("GET", "v1/agents/:id/dossier", "read", ({ params }) => s.agentDossier(params.id!)) ??
       R("POST", "v1/attestations", "write", ({ body }) => {
         const b = parse(v.object({ from: v.string({ min: 2 }), to: v.string({ min: 2 }), note: v.withDefault(v.string({ max: 200 }), "") }), body);
         return s.attest(b.from, b.to, b.note);

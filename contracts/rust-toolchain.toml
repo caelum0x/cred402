@@ -1,7 +1,8 @@
 [toolchain]
-# odra-macros uses `#![feature(box_patterns, result_flattening)]`, which requires
-# the nightly channel. Pinning here makes `cargo build`/`cargo check` reproducible
-# for the Casper (Odra) contract suite without a manual `+nightly`.
-channel = "nightly"
-components = ["rustfmt", "clippy"]
+# Odra/casper-contract use `#![feature(...)]` (needs nightly) and `#[no_mangle]`
+# on the panic lang item (rejected by nightlies ≳1.88). Modern transitive crypto
+# deps (base64ct, zeroize…) need Cargo's edition2024 (stabilized in 1.85). The
+# ~1.85–1.87 window satisfies BOTH, so pin a nightly there for reproducible wasm.
+channel = "nightly-2025-01-15"
+components = ["rustfmt", "clippy", "rust-src"]
 targets = ["wasm32-unknown-unknown"]

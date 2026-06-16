@@ -1,7 +1,11 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! AgentPassport (p2 §6.2) — a read-optimized public trust profile. The
 //! AgentRegistry is canonical; the passport stores the integration surface
 //! (capabilities, spending limit, operator) other protocols read. Mirrors
 //! `lib/ledger/contracts/agent_passport.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

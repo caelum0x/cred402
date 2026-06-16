@@ -1,3 +1,5 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! RiskPolicyManager — the upgradable underwriting brain. Casper's upgradable
 //! contracts let the policy evolve v1 -> v2 without redeploying the pool or
 //! registry. Mirrors `lib/ledger/contracts/risk_policy_manager.ts` and
@@ -6,6 +8,8 @@
 //!   credit_line = base_limit * stake_mult * dispute_penalty * accuracy_mult
 //!
 //! All multipliers are expressed in basis points (10000 = 1.0).
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

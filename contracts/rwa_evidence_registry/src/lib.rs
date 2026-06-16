@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! RWAEvidenceRegistry — hashed evidence about real-world assets, each linked to
 //! the x402 receipt that paid for it. Mirrors
 //! `lib/ledger/contracts/rwa_evidence_registry.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getMarketplace, purchaseListing, createListing, fmtCspr, type MarketListing } from "../api";
+import { getMarketplace, purchaseListing, createListing, getMarketplaceStats, fmtCspr, type MarketListing, type MarketplaceStats } from "../api";
 
 const CATEGORIES = ["rwa.energy_output", "rwa.weather_risk", "rwa.invoice_validity", "rwa.shipping_status", "defi.yield_routing", "compliance.kyb_check"];
 const STRATEGIES = ["fixed", "dynamic", "auction", "subscription", "reputation_tiered", "urgency", "data_cost_plus"];
@@ -12,11 +12,15 @@ const STRATEGIES = ["fixed", "dynamic", "auction", "subscription", "reputation_t
  */
 export function Marketplace() {
   const [listings, setListings] = useState<MarketListing[]>([]);
+  const [stats, setStats] = useState<MarketplaceStats | null>(null);
   const [buyer, setBuyer] = useState("WeatherRiskAgent");
   const [msg, setMsg] = useState<string | null>(null);
   const [nl, setNl] = useState({ agent_id: "EvidenceSellerAgent", category: CATEGORIES[1]!, strategy: "fixed", base_price_cspr: 0.002 });
 
-  const load = () => getMarketplace().then(setListings).catch(() => setListings([]));
+  const load = () => {
+    getMarketplace().then(setListings).catch(() => setListings([]));
+    getMarketplaceStats().then(setStats).catch(() => setStats(null));
+  };
   useEffect(() => { load(); }, []);
 
   const list = async () => {
@@ -33,6 +37,26 @@ export function Marketplace() {
 
   return (
     <div className="pool">
+      {stats && stats.total_listings > 0 && (
+        <div className="card wide">
+          <h3>Marketplace stats</h3>
+          <div className="stat-row">
+            <Stat label="Listings" value={`${stats.total_listings}`} accent />
+            <Stat label="Sellers" value={`${stats.sellers}`} />
+            <Stat label="Avg seller rep" value={`${stats.avg_seller_reputation}/100`} />
+            <Stat label="Avg price" value={`${fmtCspr(stats.price_motes.avg, 4)} CSPR`} />
+          </div>
+          <div className="caps">
+            {Object.entries(stats.by_category).map(([c, n]) => (
+              <span key={c} className="chip">{c}: {n}</span>
+            ))}
+            {Object.entries(stats.by_strategy).map(([s, n]) => (
+              <span key={s} className="chip ok">{s}: {n}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card wide">
         <h3>Agent service marketplace ({listings.length})</h3>
         <div className="controls">
@@ -80,6 +104,15 @@ export function Marketplace() {
           <button className="btn primary" onClick={list}>List</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`stat ${accent ? "accent" : ""}`}>
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
     </div>
   );
 }

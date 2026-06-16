@@ -46,6 +46,11 @@ import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
 import { buildProtocolConfig } from "../lib/services/protocol_config.js";
 import { findSimilarAgents } from "../lib/services/similar_agents.js";
+import { buildAgentDossier } from "../lib/services/agent_dossier.js";
+import { computeSafeDraw } from "../lib/services/safe_draw.js";
+import { buildLpDepositPreview } from "../lib/services/lp_deposit_preview.js";
+import { buildMarketplaceStats } from "../lib/services/marketplace_stats.js";
+import { buildReputationBreakdown } from "../lib/services/reputation_breakdown.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -301,6 +306,26 @@ export class ServerState {
   /** Comparable alternative agents for a given agent ("you might also consider"). */
   similarAgents(agentId: string, limit?: number) {
     return findSimilarAgents(this.ledger, this.attestations, agentId, limit);
+  }
+  /** One-call integrator dossier: tier + health + readiness + benchmark + line. */
+  agentDossier(agentId: string) {
+    return buildAgentDossier(this.ledger, this.attestations, agentId);
+  }
+  /** Largest additional draw keeping the line at/above a target health factor. */
+  safeDraw(agentId: string, targetHfBps?: number) {
+    return computeSafeDraw(this.ledger, agentId, targetHfBps);
+  }
+  /** Preview an LP deposit: resulting share, utilization, projected yield. */
+  lpDepositPreview(depositCspr: number) {
+    return buildLpDepositPreview(this.ledger, this.economics, depositCspr);
+  }
+  /** Marketplace supply-side statistics (categories, strategies, prices, sellers). */
+  marketplaceStats() {
+    return buildMarketplaceStats(this.marketplace);
+  }
+  /** Per-dimension breakdown of an agent's composite reputation. */
+  reputationBreakdown(agentId: string) {
+    return buildReputationBreakdown(this.ledger, agentId);
   }
   /** Issue a sign-in challenge for a Casper account to sign in its wallet. */
   walletChallenge(account: string) {

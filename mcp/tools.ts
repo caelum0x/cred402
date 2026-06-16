@@ -17,6 +17,7 @@ import { buildYieldProjection } from "../lib/services/yield_projection.js";
 import { ProtocolEconomics } from "../lib/core/economics.js";
 import { buildOnboardingScorecard } from "../lib/services/onboarding_scorecard.js";
 import { buildScoreTrend } from "../lib/services/score_trend.js";
+import { buildReputationBreakdown } from "../lib/services/reputation_breakdown.js";
 import { buildFleetOverview } from "../lib/services/fleet_overview.js";
 import { reviewCreditLine } from "../lib/services/credit_review.js";
 import { buildAgentMultichainSummary } from "../lib/services/agent_multichain.js";
@@ -27,6 +28,9 @@ import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
 import { buildProtocolConfig } from "../lib/services/protocol_config.js";
 import { findSimilarAgents } from "../lib/services/similar_agents.js";
+import { buildAgentDossier } from "../lib/services/agent_dossier.js";
+import { computeSafeDraw } from "../lib/services/safe_draw.js";
+import { buildLpDepositPreview } from "../lib/services/lp_deposit_preview.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { ProtocolEconomics as ProtocolEconomicsForCost } from "../lib/core/economics.js";
@@ -409,6 +413,12 @@ export const TOOLS: ToolDef[] = [
     handler: (a, econ) => jsonSafe(buildOnboardingScorecard(econ.ledger, String(a.agent_id))),
   },
   {
+    name: "cred402.reputation_breakdown",
+    description: "Per-dimension breakdown of an agent's composite reputation (quality, timeliness, dispute, revenue, repayment, expertise) with each dimension's value, weight and contribution — actionable feedback.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildReputationBreakdown(econ.ledger, String(a.agent_id))),
+  },
+  {
     name: "cred402.score_trend",
     description: "The agent's credit-score and reputation trajectory over time (current, net change, and points), reconstructed from the event log.",
     inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
@@ -441,6 +451,24 @@ export const TOOLS: ToolDef[] = [
     description: "Itemize the full cost of a specific draw against an agent's line: upfront origination fee, prorated interest over the term, total repayment and effective all-in cost.",
     inputSchema: { type: "object", properties: { agent_id: str("agent id"), draw_cspr: num("draw amount in CSPR") }, required: ["agent_id", "draw_cspr"] },
     handler: (a, econ) => jsonSafe(computeCreditCost(econ.ledger, new ProtocolEconomicsForCost(), String(a.agent_id), Number(a.draw_cspr))),
+  },
+  {
+    name: "cred402.lp_deposit_preview",
+    description: "Preview an LP deposit: resulting pool share, utilization, and projected annual yield on the deposit — without moving funds.",
+    inputSchema: { type: "object", properties: { deposit_cspr: num("deposit amount in CSPR") }, required: ["deposit_cspr"] },
+    handler: (a, econ) => jsonSafe(buildLpDepositPreview(econ.ledger, new ProtocolEconomicsForCost(), Number(a.deposit_cspr))),
+  },
+  {
+    name: "cred402.safe_draw",
+    description: "Advise the largest additional draw that keeps an agent's credit line at or above a target health factor (default 1.5x), bounded by line headroom and pool liquidity.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), target_hf_bps: num("target health factor in bps (default 15000 = 1.5x)") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(computeSafeDraw(econ.ledger, String(a.agent_id), a.target_hf_bps !== undefined ? Number(a.target_hf_bps) : undefined)),
+  },
+  {
+    name: "cred402.agent_dossier",
+    description: "One-call integrator snapshot for an agent: tier, health, readiness, peer-benchmark percentile, reputation momentum, credit line and operator — the bureau view bundled.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildAgentDossier(econ.ledger, trustGraph(econ), String(a.agent_id))),
   },
   {
     name: "cred402.similar_agents",

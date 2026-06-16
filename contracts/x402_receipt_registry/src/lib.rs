@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! X402ReceiptRegistry — commitments for x402 machine-to-machine payments. These
 //! signed receipts are the verifiable cash-flow proofs the credit policy reads.
 //! Mirrors `lib/ledger/contracts/x402_receipt_registry.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

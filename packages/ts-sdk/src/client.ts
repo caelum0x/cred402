@@ -129,6 +129,9 @@ export class Cred402Client {
   yieldProjection(): Promise<unknown> {
     return this.request("GET", "/v1/credit/yield-projection");
   }
+  lpDepositPreview(deposit_cspr: number): Promise<unknown> {
+    return this.request("GET", `/v1/credit/lp-preview?deposit_cspr=${deposit_cspr}`);
+  }
   fleetOverview(agent_ids: string[]): Promise<unknown> {
     return this.request("POST", "/v1/operators/fleet-overview", { agent_ids });
   }
@@ -147,6 +150,9 @@ export class Cred402Client {
   scoreTrend(agent_id: string): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/score-trend`);
   }
+  reputationBreakdown(agent_id: string): Promise<unknown> {
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/reputation-breakdown`);
+  }
   agentMultichain(agent_id: string): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/multichain`);
   }
@@ -157,8 +163,15 @@ export class Cred402Client {
     const suffix = limit !== undefined ? `?limit=${limit}` : "";
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/similar${suffix}`);
   }
+  agentDossier(agent_id: string): Promise<unknown> {
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/dossier`);
+  }
   creditCost(agent_id: string, draw_cspr: number): Promise<unknown> {
     return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/credit-cost?draw_cspr=${draw_cspr}`);
+  }
+  safeDraw(agent_id: string, target_hf_bps?: number): Promise<unknown> {
+    const suffix = target_hf_bps !== undefined ? `?target_hf_bps=${target_hf_bps}` : "";
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/safe-draw${suffix}`);
   }
   simulateCredit(input: { monthly_revenue_cspr: number; reputation?: number; stake_cspr?: number; accuracy?: number; dispute_rate?: number; jobs_completed?: number; service_type?: string }): Promise<unknown> {
     return this.request("POST", "/v1/credit/simulate", input);
@@ -199,6 +212,9 @@ export class Cred402Client {
   }
   x402Stats(): Promise<unknown> {
     return this.request("GET", "/v1/analytics/x402");
+  }
+  marketplaceStats(): Promise<unknown> {
+    return this.request("GET", "/v1/analytics/marketplace");
   }
   notifications(): Promise<unknown[]> {
     return this.request("GET", "/v1/notifications");

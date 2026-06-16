@@ -18,8 +18,8 @@ members = [
 ]
 
 [workspace.dependencies]
-odra = { version = "1.4.0", default-features = false }
-odra-test = { version = "1.4.0", default-features = false }
+odra = { version = "2", default-features = false }
+odra-test = { version = "2", default-features = false }
 
 [profile.release]
 codegen-units = 1

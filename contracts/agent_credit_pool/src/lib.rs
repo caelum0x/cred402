@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! AgentCreditPool — the DeFi pool. LPs deposit CSPR; high-scoring agents draw
 //! working capital against verified x402 cash flow and repay with interest.
 //! Mirrors `lib/ledger/contracts/agent_credit_pool.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

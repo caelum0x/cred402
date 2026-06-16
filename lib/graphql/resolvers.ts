@@ -16,6 +16,7 @@ export interface GraphQLDataSource {
   reputationMovers(limit?: number): unknown;
   disputeStats(): unknown;
   x402Stats(): unknown;
+  marketplaceStats(): unknown;
   search(q: string): unknown;
   notifications(): unknown;
   timeseries(): unknown;
@@ -35,10 +36,13 @@ export interface GraphQLDataSource {
   compareAgents(a: string, b: string): unknown;
   creditHistory(agentId: string): unknown;
   scoreTrend(agentId: string): unknown;
+  reputationBreakdown(agentId: string): unknown;
   agentMultichain(agentId: string): unknown;
   agentHealth(agentId: string): unknown;
+  agentDossier(agentId: string): unknown;
   similarAgents(agentId: string, limit?: number): unknown;
   creditCost(agentId: string, drawCspr: number): unknown;
+  safeDraw(agentId: string, targetHfBps?: number): unknown;
   onboardingScorecard(agentId: string): unknown;
   riskAlerts(): unknown;
   yieldProjection(): unknown;
@@ -108,6 +112,7 @@ export function makeRoot(src: GraphQLDataSource) {
     reputationMovers: ({ limit }: { limit?: number }) => src.reputationMovers(limit),
     disputeStats: () => src.disputeStats(),
     x402Stats: () => src.x402Stats(),
+    marketplaceStats: () => src.marketplaceStats(),
     timeseries: () => src.timeseries(),
     notifications: () => src.notifications(),
     search: ({ q }: { q: string }) => src.search(q),
@@ -120,10 +125,13 @@ export function makeRoot(src: GraphQLDataSource) {
     compareAgents: ({ a, b }: { a: string; b: string }) => src.compareAgents(a, b),
     creditHistory: ({ agentId }: { agentId: string }) => src.creditHistory(agentId),
     scoreTrend: ({ agentId }: { agentId: string }) => src.scoreTrend(agentId),
+    reputationBreakdown: ({ agentId }: { agentId: string }) => src.reputationBreakdown(agentId),
     agentMultichain: ({ agentId }: { agentId: string }) => src.agentMultichain(agentId),
     agentHealth: ({ agentId }: { agentId: string }) => src.agentHealth(agentId),
+    agentDossier: ({ agentId }: { agentId: string }) => src.agentDossier(agentId),
     similarAgents: ({ agentId, limit }: { agentId: string; limit?: number }) => src.similarAgents(agentId, limit),
     creditCost: ({ agentId, draw_cspr }: { agentId: string; draw_cspr: number }) => src.creditCost(agentId, draw_cspr),
+    safeDraw: ({ agentId, target_hf_bps }: { agentId: string; target_hf_bps?: number }) => src.safeDraw(agentId, target_hf_bps),
     readiness: ({ agentId }: { agentId: string }) => src.onboardingScorecard(agentId),
     riskAlerts: () => src.riskAlerts(),
     yieldProjection: () => src.yieldProjection(),

@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! SlashingVault (p2 §6.10) — receives slashed stake and distributes it across
 //! destinations (victim reimbursement, insurance reserve, protocol treasury,
 //! burn). Mirrors `lib/ledger/contracts/slashing_vault.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

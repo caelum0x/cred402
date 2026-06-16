@@ -41,7 +41,7 @@ const CHECKS: Check[] = [
   { group: "Casper access", component: "casper-sidecar (events)", status: has("lib/ledger/events.ts") ? "own-impl" : "pending", evidence: "EventBus + SSE stand-in for the sidecar stream" },
   { group: "Payments", component: "casper-x402 facilitator", status: has("lib/x402/x402.ts") ? "own-impl" : "pending", evidence: "lib/x402 (real 402→sign→verify flow)" },
   { group: "Payments", component: "casper-eip-712 typed auth", status: has("crosschain/standards/credit_notes.ts") ? "own-impl" : "pending", evidence: "CAN domain-separated signatures" },
-  { group: "Agents", component: "MCP server", status: has("mcp/server.ts") ? "integrated" : "pending", evidence: "mcp/ (45 tools over JSON-RPC)" },
+  { group: "Agents", component: "MCP server", status: has("mcp/server.ts") ? "integrated" : "pending", evidence: "mcp/ (49 tools over JSON-RPC)" },
   { group: "Agents", component: "Agent runtime", status: has("agents/economy.ts") ? "own-impl" : "pending", evidence: "agents/ (buyer/seller/credit/treasury/watchdog/…)" },
   { group: "Frontend", component: "Console dashboard", status: has("frontend/src/App.tsx") ? "integrated" : "pending", evidence: "frontend/ (Vite+React, 8 tabs)" },
   { group: "RWA data", component: "Open-Meteo + PV model", status: has("api/rwa_data/solar_provider.ts") ? "integrated" : "pending", evidence: "api/rwa_data (live data, real physics)" },

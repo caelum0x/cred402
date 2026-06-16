@@ -946,6 +946,37 @@ export async function getSimilarAgents(agentId: string): Promise<{ alternatives:
   return ((await res.json()) as { data: { alternatives: SimilarAgent[] } | { error: string } }).data;
 }
 
+export interface LpDepositPreview {
+  deposit_cspr: number;
+  resulting_liquidity_motes: string;
+  resulting_share: number;
+  resulting_utilization: number;
+  projected_apy: number;
+  projected_annual_yield_motes: string;
+}
+
+export async function getLpDepositPreview(depositCspr: number): Promise<LpDepositPreview | { error: string }> {
+  const res = await fetch(`/v1/credit/lp-preview?deposit_cspr=${depositCspr}`);
+  if (!res.ok) throw new Error(`lp preview failed: ${res.status}`);
+  return ((await res.json()) as { data: LpDepositPreview | { error: string } }).data;
+}
+
+export interface MarketplaceStats {
+  total_listings: number;
+  sellers: number;
+  by_category: Record<string, number>;
+  by_strategy: Record<string, number>;
+  price_motes: { min: string; avg: string; max: string };
+  avg_seller_reputation: number;
+  top_sellers: { agent_id: string; listings: number; avg_reputation: number }[];
+}
+
+export async function getMarketplaceStats(): Promise<MarketplaceStats> {
+  const res = await fetch("/v1/analytics/marketplace");
+  if (!res.ok) throw new Error(`marketplace stats failed: ${res.status}`);
+  return ((await res.json()) as { data: MarketplaceStats }).data;
+}
+
 const MOTES = 1_000_000_000;
 export function fmtCspr(motes: string | number, decimals = 3): string {
   const n = Number(motes) / MOTES;

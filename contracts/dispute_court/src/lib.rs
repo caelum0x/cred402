@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! DisputeCourt (p2 §6.9) — handles challenges against agents and issues
 //! verdicts that the SlashingVault enforces. Mirrors
 //! `lib/ledger/contracts/dispute_court.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

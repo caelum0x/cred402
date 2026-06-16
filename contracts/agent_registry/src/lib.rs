@@ -1,8 +1,13 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+
 //! AgentRegistry — on-chain identity, stake, reputation and credit score for
 //! autonomous agents. Mirrors `lib/ledger/contracts/agent_registry.ts`.
 //!
 //! Built with Odra (https://odra.dev). Build with `cargo odra build` and deploy
 //! the resulting WASM to Casper Testnet (see `scripts/deploy_testnet.ts`).
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;

@@ -8,6 +8,7 @@ import {
   getLpView,
   getPortfolio,
   getYieldProjection,
+  getLpDepositPreview,
   reviewCreditLine,
   depositLiquidity,
   withdrawLiquidity,
@@ -17,6 +18,7 @@ import {
   type LpView,
   type PortfolioReport,
   type YieldProjection,
+  type LpDepositPreview,
 } from "../api";
 
 export function CreditPool({ snapshot }: { snapshot: Snapshot }) {
@@ -74,6 +76,7 @@ export function CreditPool({ snapshot }: { snapshot: Snapshot }) {
           <button className="btn" onClick={() => advanceClock(30).then(() => location.reload())} title="Advance the protocol clock to accrue interest">⏩ Advance 30 days</button>
           <span className="muted" style={{ alignSelf: "center" }}>LPs earn yield from agent interest + fees.</span>
         </div>
+        <LpDepositPreviewWidget />
       </div>
 
       <div className="card wide">
@@ -233,6 +236,29 @@ export function CreditPool({ snapshot }: { snapshot: Snapshot }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function LpDepositPreviewWidget() {
+  const [amount, setAmount] = useState("1000");
+  const [preview, setPreview] = useState<LpDepositPreview | null>(null);
+  const run = () => {
+    const n = Number(amount);
+    if (!(n > 0)) return;
+    getLpDepositPreview(n).then((p) => setPreview("error" in p ? null : p)).catch(() => setPreview(null));
+  };
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div className="controls" style={{ gap: 8 }}>
+        <input className="input" style={{ width: 140 }} value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="CSPR to deposit" />
+        <button className="btn" onClick={run}>Preview deposit</button>
+        {preview && (
+          <span className="muted" style={{ alignSelf: "center" }}>
+            → {(preview.resulting_share * 100).toFixed(1)}% pool share · projected {(preview.projected_apy * 100).toFixed(2)}% APY · ~{fmtCspr(preview.projected_annual_yield_motes)} CSPR/yr
+          </span>
+        )}
+      </div>
     </div>
   );
 }

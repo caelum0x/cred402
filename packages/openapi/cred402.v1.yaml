@@ -362,6 +362,26 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/agents/{id}/safe-draw:
+    get:
+      tags: [Credit]
+      operationId: getSafeDraw
+      summary: Safe-draw advisor
+      description: "The largest additional draw that keeps the agent's line at or above a target health factor (default 1.5×), bounded by line headroom and pool free liquidity. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+        - { name: target_hf_bps, in: query, required: false, schema: { type: integer, default: 15000 }, description: "Target health factor in bps (10000 = 1.0×)." }
+      responses:
+        "200":
+          description: Safe-draw advice.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/agents/{id}/credit-cost:
     get:
       tags: [Credit]
@@ -374,6 +394,25 @@ paths:
       responses:
         "200":
           description: Cost breakdown.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/dossier:
+    get:
+      tags: [Agents]
+      operationId: getAgentDossier
+      summary: One-call agent dossier
+      description: "Integrator snapshot bundling the bureau view (tier, health, readiness, benchmark percentile, reputation momentum, credit line, operator) in a single round-trip. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Agent dossier.
           content:
             application/json:
               schema:
@@ -432,6 +471,25 @@ paths:
       responses:
         "200":
           description: Cross-chain summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/reputation-breakdown:
+    get:
+      tags: [Agents]
+      operationId: getReputationBreakdown
+      summary: Reputation score breakdown
+      description: "Per-dimension breakdown of the agent's composite reputation (quality, timeliness, dispute, revenue, repayment, category expertise, collusion penalty) with each dimension's value, weight and contribution. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Reputation breakdown.
           content:
             application/json:
               schema:
@@ -523,6 +581,23 @@ paths:
       responses:
         "200":
           description: Category analytics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics/marketplace:
+    get:
+      tags: [Analytics, Marketplace]
+      operationId: getMarketplaceStats
+      summary: Marketplace supply statistics
+      description: "Supply-side stats for the agent service marketplace: listings by category and pricing strategy, the price range, average seller reputation, and the most active sellers. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Marketplace statistics.
           content:
             application/json:
               schema:
@@ -680,6 +755,25 @@ paths:
       responses:
         "200":
           description: Portfolio report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/lp-preview:
+    get:
+      tags: [Credit]
+      operationId: getLpDepositPreview
+      summary: LP deposit preview
+      description: "Preview an LP deposit: resulting pool share, utilization, and projected annual yield on the deposit — without moving funds. **Requires `read` scope.**"
+      parameters:
+        - { name: deposit_cspr, in: query, required: true, schema: { type: number }, description: Deposit amount in CSPR. }
+      responses:
+        "200":
+          description: Deposit preview.
           content:
             application/json:
               schema:

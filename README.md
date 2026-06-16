@@ -26,6 +26,27 @@ DeFi was built for wallets. Cred402 is built for **workers**: it turns agents fr
 
 The console proxies `/api` + `/v1` to the API (same-origin via Vercel rewrites). The Render free instance cold-starts (~50 s) after idle.
 
+### Casper Testnet contracts (live, on-chain)
+
+Deployed as real Odra (Rust→Wasm) contracts on **casper-test** (Casper 2.0) via the
+Odra livenet deployer. Deployer account `01327e5e…1ae9`. Full manifest in
+[`deploys.testnet.json`](deploys.testnet.json); browse on [cspr.live](https://testnet.cspr.live).
+
+| Contract | Casper Testnet contract hash |
+| -------- | ---------------------------- |
+| AgentRegistry | `hash-e6312b89e68be91df3472a07feac489371ac542bd1e322ea2a79af1fb5f260f1` |
+| X402ReceiptRegistry | `hash-769ad110c9e53d1de7b9813a3ae3c6b4190e7d7c427efc287533362e71351a89` |
+| RWAEvidenceRegistry | `hash-2a51bdd7522538f592242f77b168f09e2e7d363d0904f9cb9910e8223400b3b6` |
+| RWAAssetRegistry | `hash-6745f7278c0140a2e6fe3504f8e4f800b37605599516b8719b92a97dd756f7ae` |
+| ReputationEngine | `hash-70ff456a864d4d14824c08f90a737dd82dba68647032d82fdddcf4c8304761ad` |
+| AgentCreditPool | `hash-c7515e5a824a54adf4b49f8088ddc58844b1fb04ce43055f99f7e55adf88700c` |
+| RiskPolicyManager | `hash-606e01827d5de2dd8e128c669fbb17d9e3165bd2817ce310303c65fe22d3a3e5` |
+| AgentPassport | `hash-ee749fb49e2ff5decd80cfe35fa15df15c8cdc8e34e61f3142889404ca58e228` |
+| DisputeCourt | `hash-f1de44616664a99bb5fe7f79af4638125a042a4b6c6a9f0ce56b05c0f0dc5fed` |
+
+Build + deploy: `cd contracts && cargo odra build`, then the Odra livenet deployer
+(`contracts/deploy_all_testnet.sh`) with a funded `casper-test` key.
+
 ## The magic loop
 
 ```

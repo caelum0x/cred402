@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! ReputationEngine (p2 §6.6) — derives a multi-dimensional reputation and folds
 //! it into a single weighted score (basis-point integer math). Mirrors
 //! `lib/ledger/contracts/reputation_engine.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 

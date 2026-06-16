@@ -1,5 +1,9 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! RWAAssetRegistry (p2 §6.4) — canonical registry of real-world asset
 //! references. Mirrors `lib/ledger/contracts/rwa_asset_registry.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 
