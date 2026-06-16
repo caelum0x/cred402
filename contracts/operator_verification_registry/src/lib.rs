@@ -1,8 +1,12 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! OperatorVerificationRegistry (p6) — links a real-world business/operator to an
 //! agent via a Stripe-Identity-style attestation, on-chain as hashes only. A
 //! verified operator strengthens credit underwriting but never replaces
 //! Casper-native receipt history. Mirrors
 //! `lib/ledger/contracts/operator_verification_registry.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 

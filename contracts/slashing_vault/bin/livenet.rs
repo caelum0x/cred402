@@ -6,7 +6,7 @@ use odra_casper_livenet_env::env;
 
 fn main() {
     let env = env();
-    env.set_gas(350_000_000_000u64);
+    env.set_gas(650_000_000_000u64);
     let contract = SlashingVault::deploy(&env, NoArgs);
     println!("CRED402_DEPLOYED slashing_vault {}", contract.address().to_string());
 }

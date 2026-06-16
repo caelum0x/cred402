@@ -1,9 +1,13 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! RealFiAttestationRegistry (p6) — a generic registry for any off-chain finance
 //! evidence (Plaid bank verification, payout confirmations, chargeback signals,
 //! sanctions clearance, accounting audits). Everything is a hash + status +
 //! provider; underwriting reads these as ADDITIONAL signals, never as a
 //! replacement for Casper-native receipts. Mirrors
 //! `lib/ledger/contracts/realfi_attestation_registry.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 

@@ -1006,6 +1006,8 @@ name = "fiat_receipt_registry"
 version = "0.1.0"
 dependencies = [
  "odra",
+ "odra-build",
+ "odra-casper-livenet-env",
  "odra-test",
 ]
 
@@ -1181,6 +1183,8 @@ name = "governance"
 version = "0.1.0"
 dependencies = [
  "odra",
+ "odra-build",
+ "odra-casper-livenet-env",
  "odra-test",
 ]
 
@@ -2115,6 +2119,8 @@ name = "operator_verification_registry"
 version = "0.1.0"
 dependencies = [
  "odra",
+ "odra-build",
+ "odra-casper-livenet-env",
  "odra-test",
 ]
 
@@ -2397,6 +2403,8 @@ name = "realfi_attestation_registry"
 version = "0.1.0"
 dependencies = [
  "odra",
+ "odra-build",
+ "odra-casper-livenet-env",
  "odra-test",
 ]
 
@@ -2906,6 +2914,8 @@ name = "slashing_vault"
 version = "0.1.0"
 dependencies = [
  "odra",
+ "odra-build",
+ "odra-casper-livenet-env",
  "odra-test",
 ]
 

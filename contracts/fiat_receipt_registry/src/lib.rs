@@ -1,7 +1,11 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! FiatReceiptRegistry (p6) — the Stripe-equivalent of the x402 receipt registry.
 //! Records privacy-preserving Fiat Receipt Envelope commitments so fiat revenue
 //! counts toward agent credit WITHOUT putting PII on-chain. Mirrors
 //! `lib/ledger/contracts/fiat_receipt_registry.ts`.
+
+extern crate alloc;
 
 use odra::prelude::*;
 

@@ -1,6 +1,10 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 //! Governance (p2 §6.11) — controls protocol parameters, fees and emergency
 //! pause flags with a public parameter history. Mirrors
 //! `lib/ledger/contracts/governance.ts`.
+
+extern crate alloc;
 
 use odra::casper_types::U512;
 use odra::prelude::*;
