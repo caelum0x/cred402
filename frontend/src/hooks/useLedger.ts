@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChainEvent, Snapshot } from "../types";
 import { getSnapshot } from "../api";
+import { streamUrl } from "../lib/config";
 
 /**
  * useLedger — keeps a live mirror of on-chain state. Subscribes to the SSE event
@@ -28,7 +29,7 @@ export function useLedger() {
 
   useEffect(() => {
     void refresh();
-    const es = new EventSource("/api/events/stream");
+    const es = new EventSource(streamUrl("/api/events/stream"));
     es.addEventListener("hello", () => setConnected(true));
     es.addEventListener("chain", (ev) => {
       try {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAnalytics, getTimeseries, getCategoryAnalytics, getReputationMovers, fmtCspr, type AnalyticsView, type SeriesPoint, type CategoryStats, type Mover } from "../api";
 import { AgentDetail } from "./AgentDetail";
 import { Sparkline } from "./Sparkline";
+import { streamUrl } from "../lib/config";
 
 /**
  * Analytics page — the live protocol dashboard: TVL/utilization, x402 throughput,
@@ -21,7 +22,7 @@ export function Analytics() {
     getCategoryAnalytics().then((c) => setCategories(c.categories)).catch(() => setCategories([]));
     getReputationMovers().then(setMovers).catch(() => setMovers(null));
     // Live updates over SSE; timeseries refreshed alongside each push.
-    const es = new EventSource("/api/analytics/stream");
+    const es = new EventSource(streamUrl("/api/analytics/stream"));
     es.addEventListener("analytics", (e) => {
       try {
         setA(JSON.parse((e as MessageEvent).data) as AnalyticsView);

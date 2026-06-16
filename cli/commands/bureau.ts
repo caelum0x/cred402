@@ -5,7 +5,7 @@
  * compact human view (or raw JSON with `--json`).
  */
 import { type CommandContext, emit, requireArg, UsageError } from "../lib/context.js";
-import { color, heading, keyValues, table } from "../lib/render.js";
+import { color, formatCspr, heading, keyValues, table } from "../lib/render.js";
 
 const USAGE = `bureau — credit-bureau analytics
 
@@ -17,7 +17,12 @@ Usage:
   cred402 bureau benchmark <agent_id>         percentile vs service cohort
   cred402 bureau readiness <agent_id>         credit-qualification scorecard
   cred402 bureau trend <agent_id>             credit-score / reputation trend
-  cred402 bureau history <agent_id>           chronological credit file`;
+  cred402 bureau history <agent_id>           chronological credit file
+  cred402 bureau health <agent_id>            green/amber/red health badge
+  cred402 bureau market                       service-category market analytics
+  cred402 bureau x402                         x402 receipt-network stats
+  cred402 bureau disputes                     protocol dispute statistics
+  cred402 bureau config                       protocol rulebook (fees, gates, tiers)`;
 
 export async function bureauCommand(ctx: CommandContext): Promise<void> {
   const sub = ctx.args[0];
@@ -38,6 +43,16 @@ export async function bureauCommand(ctx: CommandContext): Promise<void> {
       return trend(ctx);
     case "history":
       return history(ctx);
+    case "health":
+      return health(ctx);
+    case "market":
+      return market(ctx);
+    case "x402":
+      return x402(ctx);
+    case "disputes":
+      return disputes(ctx);
+    case "config":
+      return config(ctx);
     case undefined:
     case "--help":
     case "-h":
@@ -209,6 +224,108 @@ async function history(ctx: CommandContext): Promise<void> {
     table(
       [{ header: "#" }, { header: "CATEGORY" }, { header: "EVENT" }, { header: "DETAIL" }],
       h.entries.map((e) => [String(e.seq), e.category, color.bold(e.event), color.dim(e.summary)]),
+    ),
+  );
+}
+
+interface HealthFactor {
+  label: string;
+  status: string;
+  detail: string;
+}
+
+async function health(ctx: CommandContext): Promise<void> {
+  const id = requireArg(ctx.args, 1, "agent_id");
+  const h = await ctx.client.get<{ status: string; score: number; factors: HealthFactor[] }>(`/v1/agents/${encodeURIComponent(id)}/health`);
+  const dot = h.status === "green" ? color.green("●") : h.status === "amber" ? color.yellow("●") : color.red("●");
+  emit(ctx, h, () =>
+    heading(`Health — ${id}: ${dot} ${h.status} (score ${h.score})`) +
+    "\n" +
+    h.factors.map((f) => `  ${f.status === "green" ? color.green("✓") : f.status === "amber" ? color.yellow("•") : color.red("✗")} ${color.bold(f.label)} — ${color.dim(f.detail)}`).join("\n"),
+  );
+}
+
+interface CategoryRow {
+  category: string;
+  agent_count: number;
+  avg_reputation: number;
+  total_receipts: number;
+  total_revenue_motes: string;
+  top_agent: string | null;
+}
+
+async function market(ctx: CommandContext): Promise<void> {
+  const m = await ctx.client.get<{ categories: CategoryRow[] }>("/v1/analytics/categories");
+  emit(ctx, m, () =>
+    heading(`Market by category (${m.categories.length})`) +
+    "\n" +
+    table(
+      [{ header: "CATEGORY" }, { header: "AGENTS", align: "right" }, { header: "AVG REP", align: "right" }, { header: "RECEIPTS", align: "right" }, { header: "TOP" }],
+      m.categories.map((c) => [c.category, String(c.agent_count), String(c.avg_reputation), String(c.total_receipts), color.dim(c.top_agent ?? "—")]),
+    ),
+  );
+}
+
+interface CounterpartyRow {
+  agent_id: string;
+  receipts: number;
+  volume_motes: string;
+}
+
+async function x402(ctx: CommandContext): Promise<void> {
+  const x = await ctx.client.get<{ total_receipts: number; total_volume_motes: string; finalization_rate: number; top_sellers: CounterpartyRow[]; by_status: Record<string, number> }>("/v1/analytics/x402");
+  emit(ctx, x, () =>
+    heading("x402 receipt network") +
+    "\n" +
+    keyValues([
+      ["receipts", String(x.total_receipts)],
+      ["volume", formatCspr(x.total_volume_motes)],
+      ["finalization", `${(x.finalization_rate * 100).toFixed(0)}%`],
+      ["status", Object.entries(x.by_status).map(([s, n]) => `${s}:${n}`).join(" ")],
+      ["top seller", x.top_sellers[0] ? `${x.top_sellers[0].agent_id} (${formatCspr(x.top_sellers[0].volume_motes)})` : "—"],
+    ]),
+  );
+}
+
+async function disputes(ctx: CommandContext): Promise<void> {
+  const d = await ctx.client.get<{ total: number; open: number; resolved: number; resolution_rate: number; agent_loss_rate: number; by_verdict: Record<string, number>; total_slashed_motes: string }>("/v1/analytics/disputes");
+  emit(ctx, d, () =>
+    heading("Dispute statistics") +
+    "\n" +
+    keyValues([
+      ["total", `${d.total} (${d.open} open, ${d.resolved} resolved)`],
+      ["resolution_rate", `${(d.resolution_rate * 100).toFixed(0)}%`],
+      ["agent_loss_rate", `${(d.agent_loss_rate * 100).toFixed(0)}%`],
+      ["verdicts", Object.entries(d.by_verdict).map(([v, n]) => `${v}:${n}`).join(" ") || "—"],
+      ["total_slashed", formatCspr(d.total_slashed_motes)],
+    ]),
+  );
+}
+
+interface TierRow {
+  tier: string;
+  min_reputation: number;
+  credit_multiplier: number;
+  origination_discount_bps: number;
+}
+
+async function config(ctx: CommandContext): Promise<void> {
+  const c = await ctx.client.get<{ policy_version: string; fees: Record<string, number>; governance: Record<string, unknown>; reputation_tiers: TierRow[] }>("/v1/config");
+  emit(ctx, c, () =>
+    heading(`Protocol config — policy ${c.policy_version}`) +
+    "\n" +
+    keyValues([
+      ["facilitator_fee", `${(c.fees.facilitator_fee_bps / 100).toFixed(2)}%`],
+      ["origination_fee", `${(c.fees.origination_fee_bps / 100).toFixed(2)}%`],
+      ["interest_spread", `${(c.fees.interest_spread_bps / 100).toFixed(0)}%`],
+      ["min_reputation", String(c.governance.min_reputation_to_draw)],
+      ["max_exposure", formatCspr(String(c.governance.max_agent_exposure_motes))],
+    ]) +
+    heading("Reputation tiers") +
+    "\n" +
+    table(
+      [{ header: "TIER" }, { header: "MIN REP", align: "right" }, { header: "MULTIPLIER", align: "right" }, { header: "ORIG DISCOUNT", align: "right" }],
+      c.reputation_tiers.map((t) => [t.tier, String(t.min_reputation), `x${t.credit_multiplier}`, `${t.origination_discount_bps}bps`]),
     ),
   );
 }
