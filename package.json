@@ -36,7 +36,8 @@
     "sdk:demo": "tsx scripts/sdk_demo.ts",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
-    "simulate": "tsx scripts/simulate.ts"
+    "simulate": "tsx scripts/simulate.ts",
+    "demo:bureau": "tsx scripts/demo_bureau.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

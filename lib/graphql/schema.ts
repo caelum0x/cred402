@@ -60,6 +60,7 @@ export const schema = buildSchema(/* GraphQL */ `
 
   type Query {
     health: Health!
+    config: JSON!
     agents: [Agent!]!
     agent(id: ID!): Agent
     agentProfile(id: ID!): JSON

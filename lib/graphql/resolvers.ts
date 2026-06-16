@@ -10,6 +10,7 @@ import type { Agent } from "../core/types.js";
  */
 export interface GraphQLDataSource {
   readonly ledger: Ledger;
+  protocolConfig(): unknown;
   analytics(): unknown;
   categoryAnalytics(): unknown;
   reputationMovers(limit?: number): unknown;
@@ -74,6 +75,7 @@ function serializeAgent(a: Agent): Record<string, unknown> {
 export function makeRoot(src: GraphQLDataSource) {
   return {
     health: () => ({ ok: true, env: process.env.CRED402_ENV ?? "development", policy: src.ledger.policy.version() }),
+    config: () => src.protocolConfig(),
     agents: () => src.ledger.agents.list().map(serializeAgent),
     agent: ({ id }: { id: string }) => {
       const a = src.ledger.agents.get(id);

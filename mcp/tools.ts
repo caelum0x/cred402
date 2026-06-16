@@ -25,6 +25,7 @@ import { buildCategoryAnalytics } from "../lib/services/category_analytics.js";
 import { buildReputationMovers } from "../lib/services/reputation_movers.js";
 import { buildDisputeStats } from "../lib/services/dispute_stats.js";
 import { buildX402Stats } from "../lib/services/x402_stats.js";
+import { buildProtocolConfig } from "../lib/services/protocol_config.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { ProtocolEconomics as ProtocolEconomicsForCost } from "../lib/core/economics.js";
@@ -445,6 +446,12 @@ export const TOOLS: ToolDef[] = [
     description: "A glanceable green/amber/red health verdict for an agent (worst-of reputation, fraud risk, open disputes and credit-line status) with a composite score and the driving factors.",
     inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
     handler: (a, econ) => jsonSafe(buildAgentHealthBadge(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.protocol_config",
+    description: "The self-documenting protocol rulebook: fee schedule, credit gates (min reputation, max exposure), and the reputation-tier perk table.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildProtocolConfig(econ.ledger)),
   },
   {
     name: "cred402.x402_stats",

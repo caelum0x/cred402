@@ -1,222 +1,166 @@
-# Cred402 — credit lines for autonomous RWA agents on Casper
+<div align="center">
 
-> **Cred402 is an agent credit protocol for Casper. Autonomous AI agents perform paid RWA services through x402, record signed machine-to-machine receipts on Casper, build verifiable reputation, and access DeFi credit lines based on their cash flow and accuracy. It turns agents from tools into financeable economic actors.**
+<img src="frontend/public/cred402-mark.png" alt="Cred402" width="120" />
 
-**The sticky phrase: _credit scores for AI agents._**
+# Cred402 — credit scores for autonomous AI agents on Casper
 
-Agents need identity → payment rails → reputation → working capital. Casper provides the trust layer; Cred402 turns that trust into a financial protocol.
+**Agents earn anywhere. Casper decides who is creditworthy.**
+
+[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402.onrender.com/v1/health) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
+
+</div>
 
 ---
+
+> **Cred402 is the Casper-rooted credit bureau for autonomous AI agents.** Agents perform paid real-world-asset (RWA) services through **x402** machine-to-machine payments, record signed receipts and RWA evidence on **Casper**, build verifiable on-chain reputation, and borrow working capital from a DeFi credit pool against their cash flow — across every chain, with Casper as the canonical root of identity, reputation, receipts, and credit policy.
+
+DeFi was built for wallets. Cred402 is built for **workers**: it turns agents from tools into financeable economic actors. Identity → payment rails → reputation → working capital.
+
+## Live deployment
+
+| Surface | URL | Stack |
+| ------- | --- | ----- |
+| **Console** | https://cred402.vercel.app | Vite + React on Vercel |
+| **API** | https://cred402.onrender.com | `node:http` + SSE on Render |
+| **Repo** | https://github.com/caelum0x/cred402 | monorepo (TS · Rust · Go · Solidity · Python) |
+
+The console proxies `/api` + `/v1` to the API (same-origin via Vercel rewrites). The Render free instance cold-starts (~50 s) after idle.
 
 ## The magic loop
 
 ```
-1. RWA protocol needs evidence.
-2. Agent buys paid data via x402.
-3. Agent produces an RWA verification report.
-4. Report hash + payment receipt are recorded on Casper.
+1. RWA protocol needs evidence.          6. Reputation improves if the report holds up.
+2. Agent buys paid data via x402.         7. Cred402 raises the agent's credit line.
+3. Agent produces a verification report.  8. DeFi lenders finance future work.
+4. Receipt + evidence anchored on Casper. 9. More agents join to earn, borrow, build rep.
 5. Agent earns revenue.
-6. Agent reputation improves if the report proves accurate.
-7. Cred402 increases the agent's credit line.
-8. DeFi lenders finance the agent's future work.
-9. More agents join because they can earn, borrow, and build reputation.
 ```
 
-This repo implements that loop end to end: five smart contracts, a five-agent runtime, a real HTTP x402 flow, and a live dashboard.
+`npm run demo` runs this loop end-to-end in your terminal; the live console shows it with real on-chain state.
 
----
+## What's real (not mocked)
+
+Cred402 ships real integrations behind environment flags — with sim / free-API fallbacks so the demo and the **151-test suite** run on any machine with no keys.
+
+| Rail | Real integration |
+| ---- | ---------------- |
+| **Casper Testnet** | Byte-exact Casper 2.0 deploys + WASM install via `casper-js-sdk`; live node reads (`node.testnet.casper.network`). `CRED402_CHAIN=sim\|testnet`. |
+| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). |
+| **RWA data** | Live solar GHI from **Open-Meteo** (free, no key) + a real PV physics model — never random mock data. |
+| **MCP** | 44-tool server over both a zero-dep stdio transport and the official `@modelcontextprotocol/sdk` (Claude Desktop / MCP Inspector). |
+| **Event feed** | `casper-network/casper-sidecar` SSE `/events` client (faithful framing, contract-message extraction). |
+| **RealFi** | Real **Stripe** test-mode webhooks (HMAC-verified) + **Plaid** sandbox → privacy-preserving on-chain envelopes (zero PII on-chain). |
+| **Cross-chain** | EVM satellite compiles + deploys to **Base Sepolia** via Foundry; relayer anchors receipts back to Casper. |
+| **Wallet** | Real **Casper Wallet** extension connect + sign-in (challenge → ed25519 → session, `/v1/auth/wallet/*`). |
+
+All third-party code is documented in [`THIRD_PARTY.md`](THIRD_PARTY.md); the protocol logic is original.
 
 ## Quickstart
 
 ```bash
-# 1. install backend deps (zero runtime deps — node:http + node:crypto only)
 npm install
 
-# 2. run the whole loop in your terminal (no server needed)
-npm run demo            # honest happy path
-npm run demo:dispute    # stretch: falsified evidence -> watchdog slashing
+# Run the whole loop in your terminal (no server, no keys):
+npm run demo               # honest happy path
+npm run demo:dispute       # falsified evidence → watchdog slashing
+npm run demo:multichain    # Casper-rooted borrow across Base + Osmosis + Solana
+npm run demo:realfi        # Stripe/Plaid fiat receipts, zero PII on-chain
 
-# 3. run the live system + dashboard
-npm run start                       # API + x402 server on :4021      (terminal 1)
-cd frontend && npm install && npm run dev   # dashboard on :5173       (terminal 2)
-# then click "Run full loop" in the dashboard, or:
-npm run seed                        # drive the server through the loop
+# Run the live system + dashboard:
+npm run start                                   # API + x402 on :4021  (terminal 1)
+cd frontend && npm install && npm run dev       # console on :5173     (terminal 2)
 
-# 4. prove the real HTTP x402 flow against the running server
-npx tsx scripts/x402_client.ts energy_output
+# Prove the real flows:
+npm run casper:health                           # live Casper 2.0 Testnet read
+npx tsx scripts/x402_client.ts energy_output    # real 402 → EIP-712 sign → 200
+npm run mcp:sdk                                  # official MCP server (Claude Desktop)
+npm run casper:sidecar                          # stream a live Casper Sidecar (set CRED402_SIDECAR_URL)
 
-# 5. operate the protocol as an AI agent over MCP (p2)
-npm run mcp:demo        # drives the MCP server like a real client
-npm run mcp             # start the stdio MCP server for Claude Desktop etc.
-
-# 6. use the TypeScript SDK (server must be running)
-npm run sdk:demo
-
-# 7. omnichain flow (p3): Casper-rooted, chain-executed
-npm run demo:multichain   # bind EVM addr → earn on Base → anchor to Casper →
-                          # CAN-gated borrow on Base vault → repay, then the SAME
-                          # flow on Cosmos (Osmosis) AND Solana satellites —
-                          # three chain families under one shared Casper-rooted cap
-
-# 8. tests + typecheck
-npm test                # 28 cases (p1 + p2 + p3)
+# Quality gates:
+npm test                                        # 151 cases (p1–p10), node:test
 npm run typecheck
 ```
 
-For a single-origin production-style run, build the dashboard and let the API serve it:
+Single-origin production-style run (API serves the built console):
 
 ```bash
 cd frontend && npm install && npm run build && cd ..
-npm run start            # dashboard now at http://localhost:4021/
+npm run start            # console now at http://localhost:4021/
 ```
 
----
-
-## Credit-bureau analytics
-
-Beyond the core lending loop, Cred402 exposes a full credit-bureau analytics layer
-(`lib/services/`) — each surface is available over REST `/v1`, GraphQL, MCP, the
-`cred402` CLI, and all four SDKs:
-
-| Surface | Endpoint | What it answers |
-| ------- | -------- | --------------- |
-| Discovery | `GET /v1/discovery` | rank agents by a composite of reputation + credit + web-of-trust + tier − fraud |
-| Web of trust | `GET /v1/attestations/graph` · `POST /v1/attestations` | who vouches for whom (anti-Sybil-capped reputation boosts) |
-| Peer benchmark | `GET /v1/agents/:id/benchmark` | percentile + rank within the agent's service-type cohort |
-| Credit file | `GET /v1/agents/:id/history` | every on-chain event concerning an agent, categorized |
-| Score trend | `GET /v1/agents/:id/score-trend` | credit-score / reputation trajectory over time |
-| Readiness | `GET /v1/agents/:id/readiness` | pass/fail checklist of the gates to qualify for credit |
-| What-if | `POST /v1/credit/simulate` | preview a credit decision for hypothetical signals (read-only) |
-| Pre-approval offers | `POST /v1/credit/offers` → `…/accept` | time-bounded offer the agent accepts to open a line |
-| Portfolio | `GET /v1/credit/portfolio` | LP concentration risk (Herfindahl HHI) and exposure breakdowns |
-| Yield projection | `GET /v1/credit/yield-projection` | forward LP yield over 30/90/365 days |
-| Risk alerts | `GET /v1/risk/alerts` | always-on severity-ranked monitoring sweep |
-| Compliance | `GET /v1/compliance/report` | per-jurisdiction KYB coverage + sanctions exposure |
-
-Try them from the CLI: `npx tsx cli/cred402.ts bureau discover`,
-`… bureau portfolio`, `… bureau readiness <agent>`, `… bureau trend <agent>`.
-Each agent's full shareable credit file is at `GET /report/:id` (server-rendered).
-
----
+See [`.env.example`](.env.example) for every key; nothing is committed and each real integration activates only when its keys are present.
 
 ## Architecture
 
 ```
 cred402/
-  contracts/                 # 11 Odra (Rust) smart contracts for Casper
-    agent_registry/          #   identity, stake, reputation, credit score
-    agent_passport/          #   read-optimized public profile    (p2)
-    x402_receipt_registry/   #   signed x402 receipts + replay protection
-    rwa_asset_registry/      #   canonical RWA asset registry      (p2)
-    rwa_evidence_registry/   #   hashed RWA evidence linked to receipts
-    reputation_engine/       #   multi-dimensional reputation      (p2)
-    agent_credit_pool/       #   the DeFi pool: deposit / open / draw / repay
-    risk_policy_manager/     #   upgradable underwriting policy (v1 -> v2)
-    dispute_court/           #   challenges + verdicts             (p2)
-    slashing_vault/          #   slashed stake distribution        (p2)
-    governance/              #   params, fees, emergency pause     (p2)
-
+  contracts/
+    casper Odra (Rust→Wasm) ×14   AgentRegistry · AgentPassport · X402ReceiptRegistry
+                                  RWAAssetRegistry · RWAEvidenceRegistry · ReputationEngine
+                                  AgentCreditPool · RiskPolicyManager · DisputeCourt
+                                  SlashingVault · Governance · FiatReceiptRegistry
+                                  OperatorVerificationRegistry · RealFiAttestationRegistry
+    evm/ solana/ cosmos/ move/ bitcoin/   satellite contracts (Casper-rooted, chain-executed)
   lib/
-    core/                    # types, blake2b hashing, CSPR motes, risk policy math
-    ledger/                  # faithful in-memory simulation of all contracts + event bus
-    services/                # FraudService: receipt-graph collusion detection (p2)
-    x402/                    # ed25519 identities, 402 challenge, signed payment proofs
-
-  agents/                    # the autonomous economic actors
-    buyer_agent.ts           #   RWARequestAgent: posts jobs, pays via x402
-    evidence_seller_agent.ts #   runs paid endpoints, attests evidence, earns
-    credit_agent.ts          #   underwrites agents + scores RWA jobs
-    treasury_agent.ts        #   manages pool liquidity + funds draws
-    watchdog_agent.ts        #   reacts to streaming events: dispute, slash, freeze
-    dispute_judge_agent.ts   #   investigates disputes, recommends verdicts   (p2)
-    liquidity_router_agent.ts#   monitors pool utilization                    (p2)
-    economy.ts               #   wires the fleet + runs the magic loop
-
-  api/                       # zero-dependency node:http server (REST + SSE + x402)
-  mcp/                       # Cred402 MCP server: 16 tools + 6 resources      (p2)
-  sdk/                       # @cred402/sdk TypeScript client                  (p2)
-  scripts/                   # run_demo_flow, steps, seed, deploy_testnet, x402/mcp/sdk demos
-  frontend/                  # Vite + React dashboard (6 tabs + live event feed)
-  db/migrations/             # Postgres indexer schema (p2 §10.1)
-  docs/                      # architecture, demo_script, risk_model, x402_flow, protocol/*, whitepaper/*
-  test/                      # node:test suite (18 cases)
-  .github/workflows/ci.yml   # backend + frontend + demo + contracts CI
+    casper/      casper-js-sdk deploy signer + WASM installer + Sidecar SSE client (p8/p9)
+    x402/        ed25519 identities, 402 flow, real EIP-712 digests, facilitator client
+    realfi/      Stripe webhook + Plaid sandbox → hashed on-chain envelopes (p10)
+    ledger/      faithful in-memory mirror of every contract (the sim transport seam)
+    services/    fraud graph, credit bureau analytics, wallet auth, marketplace, …
+    gateway/     auth, rate-limit, validation, idempotency, webhooks, persistence
+    compliance/  sanctions + jurisdiction + KYB + data-retention
+  agents/        Buyer · EvidenceSeller · Credit · Treasury · Watchdog · DisputeJudge · LiquidityRouter
+  api/           node:http server — REST /api + production /v1 + GraphQL + SSE + x402
+  mcp/           44-tool MCP server (stdio + official SDK transports)
+  sdk/           TypeScript · Python · Go · Rust clients
+  frontend/      Vite + React console — 20 tabs + live event feed + Casper Wallet
+  crosschain/    CAID/ABE/URE/UAID/EAE/CAN standards, relayers, proof service, trust ladder
+  services/      Go event-indexer · Python risk-engine · agent-orchestrator · notifications
+  infra/         Dockerfile, docker-compose, Helm chart, Terraform
+  docs/          architecture · risk_model · x402_flow · p8/p9/p10 (real-integration phases)
 ```
 
-This repo builds the full **p1** vertical slice, the **p2 production-blueprint
-protocol layer** (Agent Passport, Reputation Engine, RWA Asset Registry, Dispute
-Court, Slashing Vault, Governance, MCP server, SDK, fraud detection, x402 replay
-protection), and the **p3 omnichain layer** (below). RWA evidence is derived from
-**real Open-Meteo solar data** via a PV physics model; all signatures use **real
-production crypto** (`@noble/curves` secp256k1 + `@noble/hashes` keccak256/blake2b).
+**Casper-rooted, chain-executed:** an agent earns x402 revenue on any chain, the receipt anchors to Casper, reputation settles on Casper, and a satellite vault may lend **only** against a Casper-signed Credit Authorization Note within the agent's global exposure cap (the cross-chain over-borrow guard). See [`PRODUCTION.md`](PRODUCTION.md) and [`ROADMAP.md`](ROADMAP.md).
 
-### p3 — Casper-rooted, chain-executed (omnichain)
+### Contract ↔ simulation parity
 
-Casper is the canonical root of trust; other chains are execution/liquidity
-satellites that anchor back to it.
+`lib/ledger/` is a faithful in-memory mirror of the Odra contracts — same state, methods, and events — so the full agent economy is reproducible with no node or key. Going live is a **transport swap**: `CRED402_CHAIN=testnet` routes writes through the real `casper-js-sdk` signer (`lib/casper/`), verified against the live Casper 2.0 Testnet.
+
+## Risk model
 
 ```
-crosschain/standards/   # CAID, ABE, URE, UAID, EAE, CAN — real dual-signature
-                        #   (ed25519 casper + secp256k1 evm) + JSON schemas + validator
-crosschain/schemas/     # JSON Schema for every envelope
-contracts/{evm,solana,cosmos,move,bitcoin}/   # satellite contracts
-packages/chain-adapters/# ChainAdapter SDK: CasperAdapter (root) + Evm/Cosmos/Solana/Move satellites + vaults
-chains/                 # per-chain network + deployment + credit-cap configs
-crosschain/relayers/    # EVM/Solana/Cosmos → Casper relayers
-services/               # multichain indexer, global-exposure, credit-note, reconciliation
+base_limit        = 0.30 × last_30d_x402_revenue
+credit_line       = base_limit × stake_multiplier × dispute_penalty × accuracy_multiplier
 ```
 
-Casper-side contracts (in `lib/ledger`, mirrored as Odra): `AddressBindingRegistry`,
-`ExternalReceiptRegistry`, `GlobalExposureManager` (the multichain over-borrow
-guard), `CreditAuthorizationNotes`, `UpgradeManager`. An agent earns x402 revenue
-on any chain, the receipt anchors to Casper, reputation settles on Casper, and a
-satellite vault may lend **only** against a Casper-signed Credit Authorization Note
-within the agent's global exposure cap. See [`ROADMAP.md`](ROADMAP.md).
+The `RiskPolicyManager` is **upgradable**: the policy hot-swaps v1 → v2 (adds a throughput bonus, harsher dispute penalty) without redeploying the pool or registries — a core reason Cred402 lives on Casper. Every credit decision carries structured, judge-friendly **reason codes**. Full detail in [`docs/risk_model.md`](docs/risk_model.md).
 
-### Why a simulated ledger?
+## Casper-native building blocks
 
-A live Testnet deploy needs a funded secret key and the compiled WASM. To keep the
-full agent economy **reproducible on any machine**, `lib/ledger` is a faithful
-in-memory mirror of the Odra contracts: same state, same methods, same events.
-Swapping it for live `casper-js-sdk` calls is a drop-in — the agents, x402 flow,
-and dashboard are unchanged. See `scripts/deploy_testnet.ts` for the live deploy
-plan and `contracts/` for the real Rust contracts.
+| Building block | Where in Cred402 |
+| -------------- | ---------------- |
+| Account abstraction | every agent owns an ed25519 identity (`lib/x402/keys.ts`) |
+| x402 micropayments | real `402 → proof → report` (`lib/x402`, `api/paid_evidence_server`) |
+| casper-eip-712 | real EIP-712 typed-data `PaymentAuthorization` digests (`lib/x402/eip712.ts`) |
+| Upgradable contracts | `RiskPolicyManager` swaps policy without redeploying the pool |
+| Streaming events | in-process bus → SSE → dashboard + WatchdogAgent; live Sidecar feed (`lib/casper/sidecar.ts`) |
+| Odra (Rust→Wasm) | 14 contracts in `contracts/` |
+| MCP + Casper Wallet | 44-tool MCP server; real wallet connect + sign-in |
 
----
+## Security
 
-## Casper-native building blocks used
+- **No secrets in source** — env-driven, validated and fail-fast at boot; `.env` gitignored.
+- **AuthN/Z** — scoped API keys (SHA-256 at rest, constant-time verify); wallet sign-in via ed25519 challenge/response.
+- **Replay protection** — nonce + payment-proof dedupe on x402 receipts; one-time CANs; global exposure cap.
+- **Privacy** — no PII on-chain; Stripe/Plaid data committed only as hashes.
+- **Accountability** — WatchdogAgent → DisputeCourt → SlashingVault; fraud graph gates underwriting.
 
-| Building block            | Where in Cred402 |
-| ------------------------- | ---------------- |
-| Account abstraction       | every agent owns an ed25519 identity (`lib/x402/keys.ts`, `agents/base_agent.ts`) |
-| x402 micropayments        | `lib/x402`, `api/paid_evidence_server`, real 402 → proof → report |
-| casper-eip-712            | domain-separated `PaymentAuthorization` signed by the payer agent |
-| Streaming events          | `lib/ledger/events.ts` → SSE → dashboard feed + WatchdogAgent |
-| Odra smart contracts      | `contracts/*` (5 modules) |
-| Upgradable contracts      | `RiskPolicyManager` swaps policy v1 → v2 without redeploying the pool |
-| Predictable fees          | agents budget x402 spend before they are paid (the reason credit exists) |
+See [`SECURITY.md`](SECURITY.md). This is hackathon/research software — do not use with real funds or real KYC/lending without an audit.
 
----
+## Demo in 90 seconds
 
-## The demo in 90 seconds
-
-A tokenized solar farm (SPV #A17, Izmir) wants a DeFi credit line. Before lenders
-fund it, autonomous agents must verify production, weather risk and receivable
-quality. Cred402 pays those agents through x402, records their work on Casper,
-scores their reliability, and gives high-performing agents working-capital credit.
-
-Run `npm run demo` to watch all six scenes; see [`docs/demo_script.md`](docs/demo_script.md).
-
-## Accountability (stretch)
-
-`npm run demo:dispute` shows the system is not merely optimistic: a seller submits
-falsified energy output, the WatchdogAgent cross-checks it against an independent
-source, opens a dispute, slashes the stake, freezes the credit line and downgrades
-reputation — all driven by Casper streaming events.
-
----
+A tokenized solar farm (SPV #A17, İzmir) wants a DeFi credit line. Autonomous agents verify production, weather risk and receivable quality; Cred402 pays them through x402, records their work on Casper, scores their reliability, and extends working-capital credit to the best performers — then `npm run demo:dispute` shows a falsified report getting caught, disputed, and slashed. Script: [`docs/demo_script.md`](docs/demo_script.md).
 
 ## License
 
 MIT. Built for the Casper Innovation Track (Agentic AI × DeFi × RWA).
-# cred402

@@ -58,6 +58,22 @@ security:
   - apiKeyAuth: []
 
 paths:
+  /v1/config:
+    get:
+      tags: [System]
+      operationId: getProtocolConfig
+      summary: Protocol config (rulebook)
+      description: "The live protocol parameters: fee schedule, credit gates (min reputation, max exposure), and the reputation-tier perk table. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Protocol config.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/health:
     get:
       tags: [System]

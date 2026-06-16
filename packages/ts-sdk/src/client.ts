@@ -51,6 +51,9 @@ export class Cred402Client {
   }
 
   // -- system -------------------------------------------------------------
+  protocolConfig(): Promise<unknown> {
+    return this.request("GET", "/v1/config");
+  }
   health(): Promise<{ ok: boolean; env: string; policy: string }> {
     return this.request("GET", "/v1/health");
   }
