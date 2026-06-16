@@ -16,6 +16,14 @@
     "demo:marketplace": "tsx scripts/marketplace_demo.ts",
     "demo:realfi": "tsx scripts/realfi_demo.ts",
     "ship:check": "tsx scripts/ship_first_check.ts",
+    "casper:health": "tsx scripts/casper_health.ts",
+    "casper:sidecar": "tsx scripts/sidecar_watch.ts",
+    "graphql:sdl": "tsx scripts/export_graphql_sdl.ts",
+    "cli": "tsx cli/cred402.ts",
+    "status": "tsx scripts/status.ts",
+    "webhook:receiver": "tsx examples/webhook-receiver/server.ts",
+    "notify": "tsx services/notification-service/src/main.ts",
+    "index:journal": "tsx -e \"console.log('run the Go indexer: cd services/event-indexer && go run ./cmd/indexer --journal \\$CRED402_DATA_DIR/events.ndjson')\"",
     "demo:request-evidence": "tsx scripts/steps.ts request-evidence",
     "demo:pay-x402": "tsx scripts/steps.ts pay-x402",
     "demo:submit-evidence": "tsx scripts/steps.ts submit-evidence",
@@ -23,10 +31,12 @@
     "deploy:testnet": "tsx scripts/deploy_testnet.ts",
     "seed": "tsx scripts/seed_demo_agents.ts",
     "mcp": "tsx mcp/server.ts",
+    "mcp:sdk": "tsx mcp/server_sdk.ts",
     "mcp:demo": "tsx scripts/mcp_demo.ts",
     "sdk:demo": "tsx scripts/sdk_demo.ts",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/*.test.ts"
+    "test": "tsx --test test/*.test.ts",
+    "simulate": "tsx scripts/simulate.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -34,7 +44,13 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "@casper-ecosystem/casper-eip-712": "^1.2.1",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@noble/curves": "^1.9.7",
-    "@noble/hashes": "^1.8.0"
+    "@noble/hashes": "^1.8.0",
+    "casper-js-sdk": "^5.0.12",
+    "graphql": "^16.14.2",
+    "plaid": "^42.2.0",
+    "stripe": "^22.2.1"
   }
 }

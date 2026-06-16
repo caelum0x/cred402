@@ -54,7 +54,9 @@ npm run sdk:demo
 
 # 7. omnichain flow (p3): Casper-rooted, chain-executed
 npm run demo:multichain   # bind EVM addr → earn on Base → anchor to Casper →
-                          # CAN-gated borrow on satellite vault → repay
+                          # CAN-gated borrow on Base vault → repay, then the SAME
+                          # flow on Cosmos (Osmosis) AND Solana satellites —
+                          # three chain families under one shared Casper-rooted cap
 
 # 8. tests + typecheck
 npm test                # 28 cases (p1 + p2 + p3)
@@ -67,6 +69,33 @@ For a single-origin production-style run, build the dashboard and let the API se
 cd frontend && npm install && npm run build && cd ..
 npm run start            # dashboard now at http://localhost:4021/
 ```
+
+---
+
+## Credit-bureau analytics
+
+Beyond the core lending loop, Cred402 exposes a full credit-bureau analytics layer
+(`lib/services/`) — each surface is available over REST `/v1`, GraphQL, MCP, the
+`cred402` CLI, and all four SDKs:
+
+| Surface | Endpoint | What it answers |
+| ------- | -------- | --------------- |
+| Discovery | `GET /v1/discovery` | rank agents by a composite of reputation + credit + web-of-trust + tier − fraud |
+| Web of trust | `GET /v1/attestations/graph` · `POST /v1/attestations` | who vouches for whom (anti-Sybil-capped reputation boosts) |
+| Peer benchmark | `GET /v1/agents/:id/benchmark` | percentile + rank within the agent's service-type cohort |
+| Credit file | `GET /v1/agents/:id/history` | every on-chain event concerning an agent, categorized |
+| Score trend | `GET /v1/agents/:id/score-trend` | credit-score / reputation trajectory over time |
+| Readiness | `GET /v1/agents/:id/readiness` | pass/fail checklist of the gates to qualify for credit |
+| What-if | `POST /v1/credit/simulate` | preview a credit decision for hypothetical signals (read-only) |
+| Pre-approval offers | `POST /v1/credit/offers` → `…/accept` | time-bounded offer the agent accepts to open a line |
+| Portfolio | `GET /v1/credit/portfolio` | LP concentration risk (Herfindahl HHI) and exposure breakdowns |
+| Yield projection | `GET /v1/credit/yield-projection` | forward LP yield over 30/90/365 days |
+| Risk alerts | `GET /v1/risk/alerts` | always-on severity-ranked monitoring sweep |
+| Compliance | `GET /v1/compliance/report` | per-jurisdiction KYB coverage + sanctions exposure |
+
+Try them from the CLI: `npx tsx cli/cred402.ts bureau discover`,
+`… bureau portfolio`, `… bureau readiness <agent>`, `… bureau trend <agent>`.
+Each agent's full shareable credit file is at `GET /report/:id` (server-rendered).
 
 ---
 
@@ -131,7 +160,7 @@ crosschain/standards/   # CAID, ABE, URE, UAID, EAE, CAN — real dual-signature
                         #   (ed25519 casper + secp256k1 evm) + JSON schemas + validator
 crosschain/schemas/     # JSON Schema for every envelope
 contracts/{evm,solana,cosmos,move,bitcoin}/   # satellite contracts
-packages/chain-adapters/# ChainAdapter SDK: CasperAdapter (root) + EvmAdapter + vault
+packages/chain-adapters/# ChainAdapter SDK: CasperAdapter (root) + Evm/Cosmos/Solana/Move satellites + vaults
 chains/                 # per-chain network + deployment + credit-cap configs
 crosschain/relayers/    # EVM/Solana/Cosmos → Casper relayers
 services/               # multichain indexer, global-exposure, credit-note, reconciliation

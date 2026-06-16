@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Snapshot } from "../types";
-import { fmtCspr, fmtTime } from "../api";
+import { fmtCspr, fmtTime, getProposals, createProposal, voteProposal, executeProposal, applyProposal, type Proposal } from "../api";
 
 async function post(path: string, body: unknown, then: () => void) {
   await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -65,6 +65,59 @@ export function Governance({ snapshot, onChange }: { snapshot: Snapshot; onChang
           </tbody>
         </table>
       </div>
+
+      <Proposals />
+    </div>
+  );
+}
+
+function Proposals() {
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [form, setForm] = useState({ title: "Raise origination fee to 0.75%", param_key: "origination_fee_bps", new_value: 75, proposer: "EvidenceSellerAgent" });
+  const [voter, setVoter] = useState("EvidenceSellerAgent");
+
+  const load = () => getProposals().then(setProposals).catch(() => setProposals([]));
+  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t); }, []);
+
+  return (
+    <div className="card wide">
+      <h3>Governance proposals</h3>
+      <div className="controls">
+        <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} style={{ flex: 1, minWidth: 200 }} />
+        <input className="input" value={form.param_key} onChange={(e) => setForm({ ...form, param_key: e.target.value })} style={{ width: 180 }} />
+        <input className="input" type="number" value={form.new_value} onChange={(e) => setForm({ ...form, new_value: Number(e.target.value) })} style={{ width: 90 }} />
+        <button className="btn primary" onClick={() => createProposal(form).then(load)}>Propose</button>
+      </div>
+      <div className="controls">
+        <span className="muted" style={{ alignSelf: "center" }}>Vote as:</span>
+        <input className="input" value={voter} onChange={(e) => setVoter(e.target.value)} style={{ width: 180 }} />
+      </div>
+      <table className="table">
+        <thead><tr><th>Proposal</th><th>Param → value</th><th>For / Against</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          {proposals.length === 0 && <tr><td colSpan={5} className="muted">No proposals.</td></tr>}
+          {proposals.map((p) => (
+            <tr key={p.id}>
+              <td>{p.title}</td>
+              <td><code>{p.param_key}</code> → {String(p.new_value)}</td>
+              <td>{p.votes_for} / {p.votes_against}</td>
+              <td><span className={`chip ${p.status === "executed" ? "ok" : p.status === "rejected" ? "bad" : "warn"}`}>{p.status}</span></td>
+              <td>
+                {p.status === "open" && (
+                  <>
+                    <button className="btn" onClick={() => voteProposal(p.id, voter, true).then(load)}>👍</button>
+                    <button className="btn" onClick={() => voteProposal(p.id, voter, false).then(load)}>👎</button>
+                    <button className="btn primary" onClick={() => executeProposal(p.id).then(load)}>Tally</button>
+                  </>
+                )}
+                {p.status === "queued" && (
+                  <button className="btn primary" onClick={() => applyProposal(p.id).then((r) => (r.error ? alert(r.error.message) : load()))} title="Apply after timelock">Apply{p.eta ? ` (eta ${fmtTime(p.eta)})` : ""}</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

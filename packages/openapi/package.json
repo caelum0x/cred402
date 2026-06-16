@@ -1,0 +1,12 @@
+{
+  "name": "@cred402/openapi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OpenAPI 3.1 specification (the contract) for the Cred402 public /v1 REST API.",
+  "license": "UNLICENSED",
+  "main": "cred402.v1.yaml",
+  "files": [
+    "cred402.v1.yaml",
+    "README.md"
+  ]
+}

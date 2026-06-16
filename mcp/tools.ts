@@ -4,6 +4,26 @@ import { hashObject } from "../lib/core/hash.js";
 import type { DisputeType } from "../lib/core/protocol_types.js";
 import { RealFiBridge } from "../lib/services/realfi_bridge.js";
 import type { VerificationLevel } from "../lib/realfi/envelopes.js";
+import { buildComplianceReport } from "../lib/services/compliance_report.js";
+import { buildPortfolioReport } from "../lib/services/portfolio.js";
+import { discoverAgents } from "../lib/services/discovery.js";
+import { AttestationGraph } from "../lib/services/attestation_graph.js";
+import { simulateUnderwriting } from "../lib/services/credit_simulator.js";
+import { buildPeerBenchmark } from "../lib/services/peer_benchmark.js";
+import { CreditOffers } from "../lib/services/credit_offers.js";
+import { buildCreditHistory } from "../lib/services/credit_history.js";
+import { buildRiskAlerts } from "../lib/services/risk_alerts.js";
+import { buildYieldProjection } from "../lib/services/yield_projection.js";
+import { ProtocolEconomics } from "../lib/core/economics.js";
+import { buildOnboardingScorecard } from "../lib/services/onboarding_scorecard.js";
+import { buildScoreTrend } from "../lib/services/score_trend.js";
+import { buildFleetOverview } from "../lib/services/fleet_overview.js";
+import { reviewCreditLine } from "../lib/services/credit_review.js";
+import { buildAgentMultichainSummary } from "../lib/services/agent_multichain.js";
+import { compareAgents } from "../lib/services/agent_compare.js";
+import { buildCategoryAnalytics } from "../lib/services/category_analytics.js";
+import { buildReputationMovers } from "../lib/services/reputation_movers.js";
+import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 
 /**
  * Cred402 MCP tool registry (p2 §12).
@@ -25,6 +45,29 @@ const num = (d: string) => ({ type: "number", description: d });
 
 function jsonSafe(v: unknown): unknown {
   return JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x)));
+}
+
+// One web-of-trust graph per economy instance, so `attest` and `discover_agents`
+// share state within an MCP session (mirrors the API's persistent AttestationGraph).
+const trustGraphs = new WeakMap<Cred402Economy, AttestationGraph>();
+function trustGraph(econ: Cred402Economy): AttestationGraph {
+  let g = trustGraphs.get(econ);
+  if (!g) {
+    g = new AttestationGraph(econ.ledger);
+    trustGraphs.set(econ, g);
+  }
+  return g;
+}
+
+// One credit-offer book per economy, so issue/accept share state within a session.
+const offerBooks = new WeakMap<Cred402Economy, CreditOffers>();
+function creditOffers(econ: Cred402Economy): CreditOffers {
+  let o = offerBooks.get(econ);
+  if (!o) {
+    o = new CreditOffers(econ.ledger, econ.credit);
+    offerBooks.set(econ, o);
+  }
+  return o;
 }
 
 export const TOOLS: ToolDef[] = [
@@ -233,6 +276,198 @@ export const TOOLS: ToolDef[] = [
         operator_verification: operatorId ? econ.ledger.operators.get_operator_verification(operatorId) : undefined,
         fiat_receipts: agentId ? econ.ledger.fiatReceipts.forSeller(agentId) : econ.ledger.fiatReceipts.list(),
         attestations: operatorId ? econ.ledger.realfi.forSubject(operatorId) : econ.ledger.realfi.list(),
+      });
+    },
+  },
+  {
+    name: "cred402.discover_agents",
+    description: "Discover and rank agents by a composite score (reputation + creditworthiness + web-of-trust + tier − fraud). Filter by service_type/min_reputation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        service_type: str("filter by service type"),
+        min_reputation: num("minimum reputation"),
+        min_score: num("minimum discovery score"),
+        limit: num("max results (default 50)"),
+      },
+      required: [],
+    },
+    handler: (a, econ) =>
+      jsonSafe(
+        discoverAgents(econ.ledger, trustGraph(econ), {
+          service_type: a.service_type ? String(a.service_type) : undefined,
+          min_reputation: a.min_reputation !== undefined ? Number(a.min_reputation) : undefined,
+          min_score: a.min_score !== undefined ? Number(a.min_score) : undefined,
+          limit: a.limit !== undefined ? Number(a.limit) : undefined,
+        }),
+      ),
+  },
+  {
+    name: "cred402.attest_agent",
+    description: "Issue a trust attestation (vouch) from one agent to another. Attester needs reputation ≥ 60; the boost is anti-Sybil capped.",
+    inputSchema: {
+      type: "object",
+      properties: { from: str("attester agent id"), to: str("target agent id"), note: str("optional note") },
+      required: ["from", "to"],
+    },
+    handler: (a, econ) => {
+      try {
+        return jsonSafe(trustGraph(econ).attest(String(a.from), String(a.to), String(a.note ?? "")));
+      } catch (err) {
+        return { error: (err as Error).message };
+      }
+    },
+  },
+  {
+    name: "cred402.compliance_report",
+    description: "Per-jurisdiction compliance report: operators grouped by jurisdiction with KYB coverage and sanctions exposure.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildComplianceReport(econ.ledger)),
+  },
+  {
+    name: "cred402.portfolio_report",
+    description: "LP-facing portfolio & concentration-risk report: utilization, exposure breakdowns, and a Herfindahl (HHI) concentration index.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildPortfolioReport(econ.ledger)),
+  },
+  {
+    name: "cred402.simulate_credit",
+    description: "Read-only 'what-if' underwriting preview: estimate the credit line, rate and reason codes for hypothetical agent signals without registering an agent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        monthly_revenue_cspr: num("30-day x402 revenue in CSPR"),
+        stake_cspr: num("staked CSPR"),
+        reputation: num("0..100 reputation"),
+        accuracy: num("0..100 evidence accuracy"),
+        dispute_rate: num("0..1 dispute fraction"),
+        jobs_completed: num("lifetime jobs"),
+        service_type: str("service category"),
+      },
+      required: ["monthly_revenue_cspr"],
+    },
+    handler: (a, econ) =>
+      jsonSafe(
+        simulateUnderwriting(econ.ledger, {
+          monthly_revenue_cspr: Number(a.monthly_revenue_cspr ?? 0),
+          stake_cspr: a.stake_cspr !== undefined ? Number(a.stake_cspr) : undefined,
+          reputation: a.reputation !== undefined ? Number(a.reputation) : undefined,
+          accuracy: a.accuracy !== undefined ? Number(a.accuracy) : undefined,
+          dispute_rate: a.dispute_rate !== undefined ? Number(a.dispute_rate) : undefined,
+          jobs_completed: a.jobs_completed !== undefined ? Number(a.jobs_completed) : undefined,
+          service_type: a.service_type ? String(a.service_type) : undefined,
+        }),
+      ),
+  },
+  {
+    name: "cred402.peer_benchmark",
+    description: "Benchmark an agent against its service-type cohort: percentile + rank for reputation, credit score, revenue and fraud (lower is better).",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildPeerBenchmark(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.issue_credit_offer",
+    description: "Issue a time-bounded credit pre-approval offer for an agent, with terms from the live underwriter (does not open a line until accepted).",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), ttl_seconds: num("acceptance deadline seconds") }, required: ["agent_id"] },
+    handler: (a, econ) =>
+      jsonSafe(creditOffers(econ).issue(String(a.agent_id), { ttl_seconds: a.ttl_seconds !== undefined ? Number(a.ttl_seconds) : undefined })),
+  },
+  {
+    name: "cred402.accept_credit_offer",
+    description: "Accept a pending, unexpired credit offer — opens a credit line at the locked terms.",
+    inputSchema: { type: "object", properties: { offer_id: str("offer id") }, required: ["offer_id"] },
+    handler: (a, econ) => jsonSafe(creditOffers(econ).accept(String(a.offer_id))),
+  },
+  {
+    name: "cred402.credit_history",
+    description: "The agent's chronological credit file: every on-chain event concerning it, categorized (identity/revenue/credit/dispute/reputation/crosschain).",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildCreditHistory(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.risk_alerts",
+    description: "Always-on risk monitoring sweep: severity-ranked alerts for concentration, overdue lines, fraud exposure on open credit, frozen/defaulted lines and liquidity stress.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildRiskAlerts(econ.ledger)),
+  },
+  {
+    name: "cred402.yield_projection",
+    description: "LP forward yield projection over 30/90/365 days: gross interest, LP share after the protocol spread, expected loss, and projected net APY.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildYieldProjection(econ.ledger, new ProtocolEconomics())),
+  },
+  {
+    name: "cred402.onboarding_readiness",
+    description: "Agent onboarding readiness scorecard: a pass/fail checklist of the gates required to qualify for credit, with guidance and an overall readiness percentage.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildOnboardingScorecard(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.score_trend",
+    description: "The agent's credit-score and reputation trajectory over time (current, net change, and points), reconstructed from the event log.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildScoreTrend(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.fleet_overview",
+    description: "Operator fleet dashboard: readiness + discovery standing + current credit line for a list of agents in one call. Unknown ids are flagged.",
+    inputSchema: {
+      type: "object",
+      properties: { agent_ids: { type: "array", items: { type: "string" }, description: "agent ids" } },
+      required: ["agent_ids"],
+    },
+    handler: (a, econ) => jsonSafe(buildFleetOverview(econ.ledger, trustGraph(econ), (a.agent_ids as string[]) ?? [])),
+  },
+  {
+    name: "cred402.review_credit_line",
+    description: "Review an existing credit line: ratchet the limit UP if the agent now qualifies for more; hold otherwise. Never auto-reduces extended credit.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(reviewCreditLine(econ.ledger, econ.credit, String(a.agent_id))),
+  },
+  {
+    name: "cred402.agent_multichain",
+    description: "An agent's cross-chain footprint: address bindings, Casper-anchored external receipts, Credit Authorization Notes per satellite chain, and its shared global exposure.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildAgentMultichainSummary(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.agent_health",
+    description: "A glanceable green/amber/red health verdict for an agent (worst-of reputation, fraud risk, open disputes and credit-line status) with a composite score and the driving factors.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(buildAgentHealthBadge(econ.ledger, String(a.agent_id))),
+  },
+  {
+    name: "cred402.reputation_movers",
+    description: "Biggest reputation gainers and losers (net change reconstructed from the event log) — momentum, not just level.",
+    inputSchema: { type: "object", properties: { limit: num("max per list (default 5)") }, required: [] },
+    handler: (a, econ) => jsonSafe(buildReputationMovers(econ.ledger, a.limit !== undefined ? Number(a.limit) : undefined)),
+  },
+  {
+    name: "cred402.category_analytics",
+    description: "Market intelligence by service category: per-category agent supply, average reputation/credit, total receipts and revenue, and the top earner.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(buildCategoryAnalytics(econ.ledger)),
+  },
+  {
+    name: "cred402.compare_agents",
+    description: "Side-by-side comparison of two agents across discovery score, reputation, credit, trust, revenue, fraud and dispute rate, with a per-metric and overall winner.",
+    inputSchema: { type: "object", properties: { a: str("first agent id"), b: str("second agent id") }, required: ["a", "b"] },
+    handler: (a, econ) => jsonSafe(compareAgents(econ.ledger, trustGraph(econ), String(a.a), String(a.b))),
+  },
+  {
+    name: "cred402.review_all_credit_lines",
+    description: "Periodic portfolio maintenance: re-underwrite every active credit line (ratchet-up only) and summarize increased/held/ineligible.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => {
+      const active = econ.ledger.pool.list().filter((l) => l.status === "active");
+      const results = active.map((l) => reviewCreditLine(econ.ledger, econ.credit, l.agent_id));
+      const ok = results.filter((r) => !("error" in r)) as Array<{ action: string }>;
+      return jsonSafe({
+        reviewed: ok.length,
+        increased: ok.filter((r) => r.action === "increased").length,
+        held: ok.filter((r) => r.action === "held").length,
+        ineligible: ok.filter((r) => r.action === "ineligible").length,
+        results,
       });
     },
   },

@@ -1,27 +1,50 @@
 import { useEffect, useState } from "react";
-import { getMarketplace, fmtCspr, type MarketListing } from "../api";
+import { getMarketplace, purchaseListing, createListing, fmtCspr, type MarketListing } from "../api";
+
+const CATEGORIES = ["rwa.energy_output", "rwa.weather_risk", "rwa.invoice_validity", "rwa.shipping_status", "defi.yield_routing", "compliance.kyb_check"];
+const STRATEGIES = ["fixed", "dynamic", "auction", "subscription", "reputation_tiered", "urgency", "data_cost_plus"];
 
 /**
  * Marketplace tab (p4 §18) — the agent-services distribution surface. Listings are
- * ranked by on-chain trust (reputation, then receipt count) so buyers pick agents
- * on proven track record, not self-reported claims.
+ * ranked by on-chain trust (reputation, then receipt count). Any agent can buy a
+ * listed service: a real x402 receipt is recorded, building the seller's revenue
+ * and reputation — the flywheel, live.
  */
 export function Marketplace() {
   const [listings, setListings] = useState<MarketListing[]>([]);
+  const [buyer, setBuyer] = useState("WeatherRiskAgent");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [nl, setNl] = useState({ agent_id: "EvidenceSellerAgent", category: CATEGORIES[1]!, strategy: "fixed", base_price_cspr: 0.002 });
 
-  useEffect(() => {
-    getMarketplace().then(setListings).catch(() => setListings([]));
-  }, []);
+  const load = () => getMarketplace().then(setListings).catch(() => setListings([]));
+  useEffect(() => { load(); }, []);
+
+  const list = async () => {
+    const r = await createListing(nl);
+    setMsg(r.data?.error ? `✗ ${r.data.error}` : `✓ listed ${nl.category} as ${r.data?.listing_id}`);
+    load();
+  };
+
+  const buy = async (l: MarketListing) => {
+    const r = await purchaseListing(l.listing_id, buyer);
+    setMsg(r.error ? `✗ ${r.error}` : `✓ ${buyer} paid ${fmtCspr(r.receipt!.amount, 4)} CSPR to ${l.agent_id} — ${r.receipt!.receipt_id}`);
+    load();
+  };
 
   return (
     <div className="pool">
       <div className="card wide">
         <h3>Agent service marketplace ({listings.length})</h3>
+        <div className="controls">
+          <span className="muted" style={{ alignSelf: "center" }}>Buyer agent:</span>
+          <input className="input" value={buyer} onChange={(e) => setBuyer(e.target.value)} style={{ width: 220 }} />
+        </div>
+        {msg && <p className="muted">{msg}</p>}
         <table className="table">
           <thead>
             <tr>
               <th>Category</th><th>Agent</th><th>Pricing</th><th>Base price</th>
-              <th>Reputation</th><th>Disputes</th><th>Receipts</th><th>Chains</th>
+              <th>Reputation</th><th>Receipts</th><th>Chains</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -33,14 +56,29 @@ export function Marketplace() {
                 <td><span className="chip">{l.strategy}</span></td>
                 <td>{fmtCspr(l.base_price, 4)} CSPR</td>
                 <td>{l.reputation_score}/100</td>
-                <td>{(l.dispute_rate * 100).toFixed(1)}%</td>
                 <td>{l.receipt_count}</td>
                 <td>{l.supported_chains.map((c) => <span key={c} className="chip" style={{ marginRight: 4 }}>{c}</span>)}</td>
+                <td><button className="btn" disabled={!buyer || buyer === l.agent_id} onClick={() => buy(l)}>Buy</button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <p className="muted">7 pricing strategies supported: fixed, dynamic, auction, subscription, reputation-tiered, urgency, data-cost-plus.</p>
+        <p className="muted">7 pricing strategies: fixed, dynamic, auction, subscription, reputation-tiered, urgency, data-cost-plus.</p>
+      </div>
+
+      <div className="card wide">
+        <h3>List a service</h3>
+        <div className="controls">
+          <input className="input" value={nl.agent_id} onChange={(e) => setNl({ ...nl, agent_id: e.target.value })} style={{ width: 180 }} placeholder="agent" />
+          <select className="input" value={nl.category} onChange={(e) => setNl({ ...nl, category: e.target.value })}>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select className="input" value={nl.strategy} onChange={(e) => setNl({ ...nl, strategy: e.target.value })}>
+            {STRATEGIES.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <input className="input" type="number" step="0.001" value={nl.base_price_cspr} onChange={(e) => setNl({ ...nl, base_price_cspr: Number(e.target.value) })} style={{ width: 110 }} />
+          <button className="btn primary" onClick={list}>List</button>
+        </div>
       </div>
     </div>
   );

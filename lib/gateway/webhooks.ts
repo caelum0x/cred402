@@ -13,6 +13,8 @@ export interface WebhookSubscription {
   id: string;
   url: string;
   events: string[]; // event names, or ["*"] for all
+  /** If set, only deliver events whose payload.agent_id matches. */
+  agent_filter?: string;
   secret: string;
   created_at: number;
   disabled_at?: number;
@@ -31,6 +33,9 @@ type FetchFn = (url: string, init: { method: string; headers: Record<string, str
 
 export class WebhookService {
   private readonly subs = new Map<string, WebhookSubscription>();
+  /** Recent delivery attempts (ring buffer) for integrator debugging. */
+  private readonly deliveryLog: Array<DeliveryAttempt & { at: number }> = [];
+  private static readonly MAX_DELIVERY_LOG = 200;
 
   constructor(
     private readonly maxRetries: number,
@@ -39,12 +44,13 @@ export class WebhookService {
     private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
   ) {}
 
-  subscribe(url: string, events: string[]): WebhookSubscription {
+  subscribe(url: string, events: string[], agentFilter?: string): WebhookSubscription {
     if (!/^https?:\/\//.test(url)) throw new Error("webhook url must be http(s)");
     const sub: WebhookSubscription = {
       id: "wh_" + randomBytes(6).toString("hex"),
       url,
       events: events.length ? events : ["*"],
+      agent_filter: agentFilter,
       secret: "whsec_" + randomBytes(24).toString("base64url"),
       created_at: this.now(),
     };
@@ -63,8 +69,11 @@ export class WebhookService {
     return [...this.subs.values()].map(({ secret: _s, ...rest }) => rest);
   }
 
-  private matches(sub: WebhookSubscription, event: string): boolean {
-    return !sub.disabled_at && (sub.events.includes("*") || sub.events.includes(event));
+  private matches(sub: WebhookSubscription, event: string, payload: Record<string, unknown>): boolean {
+    if (sub.disabled_at) return false;
+    if (!sub.events.includes("*") && !sub.events.includes(event)) return false;
+    if (sub.agent_filter && payload.agent_id !== sub.agent_filter) return false;
+    return true;
   }
 
   /** Sign `${timestamp}.${body}` with the subscription secret. */
@@ -87,10 +96,19 @@ export class WebhookService {
   async dispatch(event: string, payload: Record<string, unknown>): Promise<DeliveryAttempt[]> {
     const results: DeliveryAttempt[] = [];
     for (const sub of this.subs.values()) {
-      if (!this.matches(sub, event)) continue;
-      results.push(await this.deliverOne(sub, event, payload));
+      if (!this.matches(sub, event, payload)) continue;
+      const attempt = await this.deliverOne(sub, event, payload);
+      results.push(attempt);
+      this.deliveryLog.push({ ...attempt, at: this.now() });
+      if (this.deliveryLog.length > WebhookService.MAX_DELIVERY_LOG) this.deliveryLog.shift();
     }
     return results;
+  }
+
+  /** Recent delivery attempts, newest first. Filter by subscription id. */
+  deliveries(subscriptionId?: string): Array<DeliveryAttempt & { at: number }> {
+    const log = subscriptionId ? this.deliveryLog.filter((d) => d.subscription_id === subscriptionId) : this.deliveryLog;
+    return [...log].reverse();
   }
 
   private async deliverOne(sub: WebhookSubscription, event: string, payload: Record<string, unknown>): Promise<DeliveryAttempt> {

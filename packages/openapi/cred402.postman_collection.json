@@ -1,0 +1,89 @@
+{
+  "info": {
+    "name": "Cred402 API",
+    "description": "Cred402 — the Casper-rooted credit bureau for autonomous AI agents. Set {{base}} and {{key}} in the collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base", "value": "http://localhost:4021" },
+    { "key": "key", "value": "c402_replace_me" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{key}}", "type": "string" }] },
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        { "name": "Health", "request": { "method": "GET", "url": "{{base}}/v1/health" } },
+        { "name": "Metrics", "request": { "method": "GET", "url": "{{base}}/metrics" } }
+      ]
+    },
+    {
+      "name": "Agents",
+      "item": [
+        { "name": "List agents", "request": { "method": "GET", "url": "{{base}}/v1/agents?limit=50" } },
+        { "name": "Get agent", "request": { "method": "GET", "url": "{{base}}/v1/agents/EvidenceSellerAgent" } },
+        { "name": "Credit explain", "request": { "method": "GET", "url": "{{base}}/v1/agents/EvidenceSellerAgent/credit-explain" } },
+        { "name": "Credit report", "request": { "method": "GET", "url": "{{base}}/v1/agents/EvidenceSellerAgent/credit-report" } },
+        {
+          "name": "Register agent",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }, { "key": "Idempotency-Key", "value": "reg-1" }],
+            "url": "{{base}}/v1/agents",
+            "body": { "mode": "raw", "raw": "{\n  \"agent_id\": \"WeatherRiskAgent\",\n  \"service_type\": \"weather_risk\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Credit",
+      "item": [
+        { "name": "Pool", "request": { "method": "GET", "url": "{{base}}/v1/credit/pool" } },
+        {
+          "name": "Open credit line",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base}}/v1/credit/lines", "body": { "mode": "raw", "raw": "{ \"agent_id\": \"EvidenceSellerAgent\" }" } }
+        },
+        {
+          "name": "Draw",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base}}/v1/credit/lines/EvidenceSellerAgent/draw", "body": { "mode": "raw", "raw": "{ \"amount_cspr\": 6 }" } }
+        },
+        {
+          "name": "Underwrite batch",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base}}/v1/credit/underwrite-batch", "body": { "mode": "raw", "raw": "{ \"agent_ids\": [\"EvidenceSellerAgent\", \"WeatherRiskAgent\"] }" } }
+        }
+      ]
+    },
+    {
+      "name": "Marketplace",
+      "item": [
+        { "name": "Listings", "request": { "method": "GET", "url": "{{base}}/v1/marketplace" } },
+        {
+          "name": "Purchase",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base}}/v1/marketplace/purchase", "body": { "mode": "raw", "raw": "{ \"listing_id\": \"lst-0001\", \"buyer_agent\": \"WeatherRiskAgent\" }" } }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        { "name": "Analytics", "request": { "method": "GET", "url": "{{base}}/v1/analytics" } },
+        { "name": "Search", "request": { "method": "GET", "url": "{{base}}/v1/search?q=SOLAR" } }
+      ]
+    },
+    {
+      "name": "GraphQL",
+      "item": [
+        {
+          "name": "Query agents + analytics",
+          "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "url": "{{base}}/graphql", "body": { "mode": "raw", "raw": "{ \"query\": \"{ agents { agent_id reputation_score credit_score } analytics }\" }" } }
+        }
+      ]
+    },
+    {
+      "name": "x402",
+      "item": [
+        { "name": "402 challenge", "request": { "method": "GET", "url": "{{base}}/verify/energy_output?rwa_id=SOLAR-A17" } }
+      ]
+    }
+  ]
+}

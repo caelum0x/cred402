@@ -4,8 +4,9 @@
 > reputation, receipt, and credit-policy root for the autonomous agent economy.
 > Solana is an **execution and liquidity satellite** that anchors back to Casper.
 
-This Anchor workspace implements the Solana satellite described in
-[`docs/p3.md` §"Solana satellites"](../../docs/p3.md). The SVM family is tuned for
+This Anchor workspace implements the Solana satellite from Cred402's
+"Casper-rooted, chain-executed" multichain design (see [`docs/p10.md`](../../docs/p10.md)).
+The SVM family is tuned for
 **high-speed agent payments and real-time data markets**, so these programs
 optimize for throughput and low latency, not for being a second source of truth.
 

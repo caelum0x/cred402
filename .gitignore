@@ -8,3 +8,12 @@ frontend/dist/
 frontend/node_modules/
 .env
 .cred402-state.json
+contracts/evm/lib/
+contracts/evm/broadcast/
+deploys.evm.*.json
+# Source brand art (multi-MB Gemini exports); optimized web assets live in frontend/public/
+publ/
+.vercel/
+# Rust/build artifacts anywhere
+**/target/
+*.tsbuildinfo

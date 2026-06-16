@@ -183,8 +183,8 @@ test("AgentPassport: aggregates profile + risk flags", () => {
   assert.equal(p.stake, cspr(50));
 });
 
-test("MCP tools: registry exposes 19 tools and they dispatch", () => {
-  assert.equal(TOOL_INDEX.size, 19);
+test("MCP tools: registry exposes 40 tools and they dispatch", () => {
+  assert.equal(TOOL_INDEX.size, 40);
   const econ = new Cred402Economy(new Ledger());
   econ.bootstrap();
   econ.createJob();
@@ -192,6 +192,11 @@ test("MCP tools: registry exposes 19 tools and they dispatch", () => {
   assert.equal(passport.agent_id, econ.seller.agent_id);
   const policy = TOOL_INDEX.get("cred402.get_risk_policy")!.handler({}, econ) as { policy_version: string };
   assert.equal(policy.policy_version, "v1");
+  // the new bureau tools dispatch and return structured data
+  const discovery = TOOL_INDEX.get("cred402.discover_agents")!.handler({ limit: 5 }, econ) as { results: unknown[] };
+  assert.ok(Array.isArray(discovery.results));
+  const portfolio = TOOL_INDEX.get("cred402.portfolio_report")!.handler({}, econ) as { hhi: number };
+  assert.equal(typeof portfolio.hhi, "number");
 });
 
 test("Dispute lifecycle: tampered evidence routes through court + vault", async () => {

@@ -1,0 +1,97 @@
+scalar JSON
+
+type Health {
+  ok: Boolean!
+  env: String!
+  policy: String!
+}
+
+type Agent {
+  agent_id: ID!
+  service_type: String!
+  reputation_score: Int!
+  credit_score: Int!
+  dispute_rate: Float!
+  total_jobs_completed: Int!
+  stake: String!
+  active: Boolean!
+}
+
+type MarketListing {
+  listing_id: ID!
+  agent_id: String!
+  category: String!
+  strategy: String!
+  base_price: String!
+  reputation_score: Int!
+  dispute_rate: Float!
+  receipt_count: Int!
+  supported_chains: [String!]!
+}
+
+type Notification {
+  id: ID!
+  seq: Int!
+  severity: String!
+  title: String!
+  detail: String!
+  agent_id: String
+  timestamp: Int!
+}
+
+type SearchResult {
+  kind: String!
+  id: String!
+  label: String!
+  detail: String!
+}
+
+type Query {
+  health: Health!
+  agents: [Agent!]!
+  agent(id: ID!): Agent
+  agentProfile(id: ID!): JSON
+  creditPool: JSON!
+  creditExplain(agentId: ID!): JSON
+  compliance(agentId: ID!): JSON
+  marketplace: [MarketListing!]!
+  economics: JSON!
+  lp: JSON!
+  analytics: JSON!
+  categoryAnalytics: JSON!
+  reputationMovers(limit: Int): JSON!
+  timeseries: JSON!
+  notifications: [Notification!]!
+  search(q: String!): [SearchResult!]!
+  discovery(service_type: String, min_reputation: Int, min_score: Int, limit: Int): JSON!
+  portfolio: JSON!
+  attestationGraph: JSON!
+  benchmark(agentId: ID!): JSON
+  compareAgents(a: ID!, b: ID!): JSON
+  creditHistory(agentId: ID!): JSON
+  scoreTrend(agentId: ID!): JSON
+  agentMultichain(agentId: ID!): JSON
+  agentHealth(agentId: ID!): JSON
+  readiness(agentId: ID!): JSON
+  riskAlerts: JSON!
+  yieldProjection: JSON!
+  fleetOverview(agentIds: [ID!]!): JSON!
+  simulateCredit(monthly_revenue_cspr: Float!, reputation: Float, stake_cspr: Float): JSON!
+  creditOffers(agentId: ID): JSON!
+}
+
+type Mutation {
+  registerAgent(agent_id: ID!, service_type: String!): JSON
+  openCreditLine(agent_id: ID!): JSON
+  drawCredit(agent_id: ID!, amount_cspr: Float!): JSON
+  repayCredit(agent_id: ID!, amount_cspr: Float!): JSON
+  verifyOperator(operator_id: ID!, jurisdiction: String!, reference: String!): JSON
+  openDispute(respondent_agent: ID!, dispute_type: String, note: String): JSON
+  purchaseListing(listing_id: ID!, buyer_agent: ID!): JSON
+  stakeAgent(agent_id: ID!, amount_cspr: Float!): JSON
+  createListing(agent_id: ID!, category: String!, strategy: String, base_price_cspr: Float!): JSON
+  depositLiquidity(amount_cspr: Float!): JSON
+  issueCreditOffer(agent_id: ID!, ttl_seconds: Int, term_seconds: Int): JSON
+  acceptCreditOffer(offer_id: ID!): JSON
+  reviewCreditLine(agent_id: ID!): JSON
+}

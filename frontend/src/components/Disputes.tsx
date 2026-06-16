@@ -1,5 +1,5 @@
 import type { Snapshot } from "../types";
-import { fmtCspr, fmtTime } from "../api";
+import { fmtCspr, fmtTime, resolveDispute } from "../api";
 
 const VERDICT_CLASS: Record<string, string> = {
   agent_wins: "ok",
@@ -9,9 +9,13 @@ const VERDICT_CLASS: Record<string, string> = {
   malicious_dispute: "bad",
 };
 
-export function Disputes({ snapshot }: { snapshot: Snapshot }) {
+export function Disputes({ snapshot, onChange }: { snapshot: Snapshot; onChange?: () => void }) {
   const disputes = [...snapshot.disputes].sort((a, b) => b.opened_at - a.opened_at);
   const totalSlashed = snapshot.slashes.reduce((s, x) => s + Number(x.amount), 0);
+  const resolve = async (id: string, verdict: string, slash: number) => {
+    await resolveDispute(id, verdict, slash);
+    onChange?.();
+  };
 
   return (
     <div className="pool">
@@ -38,6 +42,13 @@ export function Disputes({ snapshot }: { snapshot: Snapshot }) {
               <ul className="rationale" style={{ marginTop: 4 }}>
                 {d.rationale.map((r, i) => <li key={i}>{r}</li>)}
               </ul>
+            )}
+            {d.status !== "resolved" && d.status !== "closed" && (
+              <div className="controls" style={{ marginTop: 4 }}>
+                <button className="btn danger" onClick={() => resolve(d.dispute_id, "agent_loses", 10)}>Rule against (slash 10)</button>
+                <button className="btn" onClick={() => resolve(d.dispute_id, "agent_wins", 0)}>Rule for agent</button>
+                <button className="btn" onClick={() => resolve(d.dispute_id, "malicious_dispute", 0)}>Malicious dispute</button>
+              </div>
             )}
           </div>
         ))}

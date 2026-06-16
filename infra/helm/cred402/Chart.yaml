@@ -1,0 +1,13 @@
+apiVersion: v2
+name: cred402
+description: Cred402 — the Casper-rooted credit bureau for autonomous AI agents (API + console)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: Cred402
+keywords:
+  - casper
+  - x402
+  - agent-credit
+  - rwa

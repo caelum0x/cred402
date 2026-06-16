@@ -85,6 +85,19 @@ export class SlashingVault {
     };
   }
 
+  /**
+   * Pay an insurance claim out of the insurance reserve (p2 §6.10) — e.g. an LP
+   * or counterparty reimbursed after a confirmed default/fraud. Reverts if the
+   * reserve cannot cover the claim.
+   */
+  claim_insurance(claimant: string, amount: bigint, reason: string): { claimant: string; paid: string; reserve_remaining: string } {
+    if (amount <= 0n) throw new Error("claim amount must be positive");
+    if (amount > this.reserves.insurance_reserve) throw new Error("insurance reserve cannot cover the claim");
+    this.reserves.insurance_reserve -= amount;
+    this.bus.emit("InsuranceClaimPaid", CONTRACT, deployHash(), { claimant, amount: amount.toString(), reason });
+    return { claimant, paid: amount.toString(), reserve_remaining: this.reserves.insurance_reserve.toString() };
+  }
+
   list(): SlashRecord[] {
     return this.records.map((r) => ({ ...r, distribution: { ...r.distribution } }));
   }

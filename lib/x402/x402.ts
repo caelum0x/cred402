@@ -1,6 +1,7 @@
 import type { ServiceType } from "../core/types.js";
-import { blake2b256, stableStringify } from "../core/hash.js";
+import { blake2b256 } from "../core/hash.js";
 import { sign, verifyCasperHex } from "./keys.js";
+import { paymentAuthorizationDigest } from "./eip712.js";
 
 /**
  * x402 — HTTP-native machine-to-machine payments.
@@ -49,9 +50,13 @@ export interface PaymentProof {
   signature: string;
 }
 
-/** Build the canonical bytes that get signed (deterministic key order). */
+/**
+ * The 32-byte EIP-712 typed-data digest that gets signed — a standards-compliant
+ * `\x19\x01` typed-data hash (via `@casper-ecosystem/casper-eip-712`), verifiable
+ * by any EIP-712-aware contract or the casper-x402 facilitator, not just by us.
+ */
 export function authorizationDigest(auth: PaymentAuthorization): string {
-  return stableStringify(auth);
+  return paymentAuthorizationDigest(auth);
 }
 
 /** Buyer side: sign a PaymentAuthorization with the agent's ed25519 key. */

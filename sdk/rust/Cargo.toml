@@ -1,0 +1,19 @@
+[package]
+name = "cred402"
+version = "0.1.0"
+edition = "2021"
+description = "Rust SDK + CLI for the Cred402 agent-credit protocol on Casper"
+license = "MIT"
+
+[dependencies]
+ureq = { version = "2.10", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lib]
+name = "cred402"
+path = "src/lib.rs"
+
+[[bin]]
+name = "cred402"
+path = "src/bin/cli.rs"

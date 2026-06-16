@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cred402-agent-orchestrator"
+version = "0.1.0"
+description = "Production autonomous agent runtime for the Cred402 protocol — a real policy engine that sits OUTSIDE the LLM (the LLM proposes, the policy engine disposes)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cred402" }]
+keywords = ["cred402", "agents", "x402", "casper", "policy-engine", "credit"]
+
+# Zero third-party dependencies: standard library only, plus the local cred402
+# SDK which is imported via sys.path by run.py (not declared here to avoid any
+# pip install). Python 3.10+.
+dependencies = []
+
+[project.scripts]
+cred402-agent = "run:main"
+
+[tool.setuptools]
+packages = ["orchestrator", "orchestrator.agents"]

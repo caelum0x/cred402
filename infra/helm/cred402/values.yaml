@@ -1,0 +1,51 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/cred402/api
+  tag: ""        # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 4021
+
+ingress:
+  enabled: false
+  className: nginx
+  host: api.cred402.example
+  tls: true
+
+env:
+  CRED402_ENV: testnet
+  CRED402_LOG_LEVEL: info
+  CRED402_AUTH_REQUIRED: "true"
+  CRED402_DATA_DIR: /data
+  CRED402_CASPER_NODE: https://rpc.testnet.casperlabs.io/rpc
+
+# Secret values are NOT stored here — reference an existing K8s Secret.
+existingSecret: cred402-secrets   # must contain CRED402_ADMIN_API_KEY, CRED402_WEBHOOK_SECRET
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001

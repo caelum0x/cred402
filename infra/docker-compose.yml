@@ -1,0 +1,57 @@
+# Cred402 local production-like stack: the API (durable journal) + the Go event
+# indexer projecting that journal. Postgres is included as the projection target
+# the indexer's Sink interface would write to.
+#
+#   docker compose -f infra/docker-compose.yml up --build
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    ports:
+      - "4021:4021"
+    environment:
+      CRED402_ENV: testnet
+      CRED402_AUTH_REQUIRED: "true"
+      CRED402_ADMIN_API_KEY: ${CRED402_ADMIN_API_KEY:?set CRED402_ADMIN_API_KEY}
+      CRED402_DATA_DIR: /data
+      CRED402_CASPER_NODE: ${CRED402_CASPER_NODE:-https://rpc.testnet.casperlabs.io/rpc}
+      CRED402_WEBHOOK_SECRET: ${CRED402_WEBHOOK_SECRET:-}
+    volumes:
+      - journal:/data
+    restart: unless-stopped
+
+  indexer:
+    build:
+      context: ../services/event-indexer
+      dockerfile_inline: |
+        FROM golang:1.24-bookworm AS build
+        WORKDIR /src
+        COPY . .
+        RUN go build -o /indexer ./cmd/indexer
+        FROM gcr.io/distroless/base-debian12
+        COPY --from=build /indexer /indexer
+        ENTRYPOINT ["/indexer"]
+    command: ["--journal", "/data/events.ndjson", "--out", "/data/projections.json", "--watch", "5s"]
+    volumes:
+      - journal:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cred402
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cred402}
+      POSTGRES_DB: cred402
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  journal:
+  pgdata:

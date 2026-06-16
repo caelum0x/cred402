@@ -1,0 +1,1967 @@
+openapi: 3.1.0
+info:
+  title: Cred402 Public REST API
+  version: "1.0.0"
+  description: |
+    The Cred402 public, externally-versioned REST API (`/v1`).
+
+    Every route runs the same production pipeline: **auth** (scoped API keys) →
+    **rate limiting** → **body validation** → **idempotency** (for mutations
+    carrying an `Idempotency-Key`) → handler → a consistent success/failure
+    envelope with a `request_id`.
+
+    ## Response envelope
+    Every response — success or failure — uses one of two shapes:
+
+    - Success: `{ "success": true, "data": <payload>, "request_id": "req_..." }`
+    - Failure: `{ "success": false, "error": { "code": "...", "message": "..." }, "request_id": "req_..." }`
+
+    Each response also carries an `X-Request-Id` header.
+
+    ## Authentication & scopes
+    Provide an API key either as a Bearer token (`Authorization: Bearer <key>`)
+    or via the `X-Api-Key` header. Keys carry scopes: `read`, `write`, `admin`
+    (an `admin` key implicitly satisfies `read` and `write`). Each operation
+    documents the scope it requires.
+
+    ## Amounts
+    On-chain / mote amounts are serialized as **decimal strings** (bigints are
+    stringified). Fiat amounts use decimal money strings like `"100.00"`.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /
+    description: Cred402 gateway (versioned routes are served under /v1)
+tags:
+  - name: System
+    description: Health and service metadata.
+  - name: Agents
+    description: Agent registry, passports, and credit explainability.
+  - name: Credit
+    description: Credit pool, credit lines, draws and repayments.
+  - name: RealFi
+    description: RealFi protocol state, operator verification, and fiat receipts.
+  - name: Compliance
+    description: Compliance screening for agents.
+  - name: Analytics
+    description: Protocol analytics, economics, notifications, and search.
+  - name: Marketplace
+    description: Marketplace view.
+  - name: Disputes
+    description: Dispute lifecycle.
+  - name: Admin
+    description: API key management and webhook subscriptions (admin scope).
+
+security:
+  - bearerAuth: []
+  - apiKeyAuth: []
+
+paths:
+  /v1/health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Service health
+      description: |
+        Liveness and basic environment/policy info. **Requires `read` scope.**
+      responses:
+        "200":
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents:
+    get:
+      tags: [Agents]
+      operationId: listAgents
+      summary: List agents
+      description: "List every registered agent. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Array of agents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentListResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      tags: [Agents]
+      operationId: registerAgent
+      summary: Register an agent
+      description: |
+        Register a new agent and return its freshly built passport.
+        **Requires `write` scope.**
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterAgentRequest"
+            example:
+              agent_id: "solar-oracle-1"
+              service_type: "solar_output_verification"
+              agent_public_key: "01"
+              owner_public_key: "01"
+      responses:
+        "200":
+          description: The registered agent's passport.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PassportResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}:
+    get:
+      tags: [Agents]
+      operationId: getAgent
+      summary: Get an agent
+      description: "Fetch a single agent by id. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The agent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/passport:
+    get:
+      tags: [Agents]
+      operationId: getAgentPassport
+      summary: Get an agent passport
+      description: "Build and return the agent's passport. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The agent passport.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PassportResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/credit-line:
+    get:
+      tags: [Agents, Credit]
+      operationId: getAgentCreditLine
+      summary: Get an agent's credit line
+      description: "Fetch the credit line for an agent. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: The credit line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditLineResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/credit-explain:
+    get:
+      tags: [Agents, Credit]
+      operationId: getAgentCreditExplain
+      summary: Explain an agent's credit decision
+      description: "Return the explainability breakdown for an agent's credit. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Credit explainability payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/compliance/agents/{id}:
+    get:
+      tags: [Compliance]
+      operationId: getComplianceScreen
+      summary: Screen an agent for compliance
+      description: "Run a compliance screen for an agent. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Compliance screening result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/history:
+    get:
+      tags: [Agents, Credit]
+      operationId: getCreditHistory
+      summary: Agent credit history (credit file)
+      description: "Every on-chain event concerning the agent in chronological order, categorized (identity/revenue/credit/dispute/reputation/crosschain). **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Credit history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/wallet/challenge:
+    post:
+      tags: [System]
+      operationId: walletChallenge
+      summary: Issue a sign-in challenge for a Casper account
+      description: "Start sign-in-with-Casper-Wallet: returns a one-time nonce + message for the wallet to sign. **Requires `read` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account]
+              properties:
+                account: { type: string, description: "Casper ed25519 public key (01 + 64 hex)." }
+      responses:
+        "200":
+          description: The challenge to sign.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/wallet/verify:
+    post:
+      tags: [System]
+      operationId: walletVerify
+      summary: Verify a signed challenge → mint a session
+      description: "Complete sign-in: verifies the wallet's ed25519 signature over the challenge and mints a session token. **Requires `read` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nonce, signature]
+              properties:
+                nonce: { type: string }
+                signature: { type: string, description: "ed25519 signature hex." }
+      responses:
+        "200":
+          description: The minted session (or an error).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/wallet/agents:
+    get:
+      tags: [System, Agents]
+      operationId: getWalletAgents
+      summary: Agents owned by the signed-in wallet
+      description: "Returns the agents whose owner key matches the wallet account behind a session token. **Requires `read` scope.**"
+      parameters:
+        - { name: token, in: query, required: true, schema: { type: string }, description: Wallet session token from /verify. }
+      responses:
+        "200":
+          description: Owned agents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/Unauthorized" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/health:
+    get:
+      tags: [Agents]
+      operationId: getAgentHealth
+      summary: Agent health badge (green/amber/red)
+      description: "A glanceable green/amber/red verdict (worst-of reputation, fraud risk, open disputes, credit-line status) with a composite score and driving factors. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Health badge.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/multichain:
+    get:
+      tags: [Agents]
+      operationId: getAgentMultichain
+      summary: Agent cross-chain footprint
+      description: "An agent's address bindings, Casper-anchored external receipts, Credit Authorization Notes per satellite chain, and shared global exposure. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Cross-chain summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/score-trend:
+    get:
+      tags: [Agents, Credit]
+      operationId: getScoreTrend
+      summary: Credit-score & reputation trend
+      description: "The agent's credit-score and reputation trajectory over time (current, net change, points), reconstructed from the event log. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Score trend.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/readiness:
+    get:
+      tags: [Agents, Credit]
+      operationId: getOnboardingReadiness
+      summary: Agent onboarding readiness scorecard
+      description: "Pass/fail checklist of the gates an agent must satisfy to qualify for credit, with guidance and an overall readiness percentage. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Onboarding scorecard.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/benchmark:
+    get:
+      tags: [Agents]
+      operationId: getPeerBenchmark
+      summary: Peer benchmark for an agent
+      description: "Percentile and rank of an agent against its service-type cohort across reputation, credit score, revenue and fraud. **Requires `read` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/AgentId"
+      responses:
+        "200":
+          description: Peer benchmark.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/compliance/report:
+    get:
+      tags: [Compliance]
+      operationId: getComplianceReport
+      summary: Per-jurisdiction compliance report
+      description: "Operators grouped by jurisdiction with KYB coverage and sanctions exposure. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Compliance report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics/categories:
+    get:
+      tags: [Analytics]
+      operationId: getCategoryAnalytics
+      summary: Service-category market analytics
+      description: "Market intelligence aggregated by service type: per-category agent supply, average reputation/credit, total receipts and revenue, and the top earner. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Category analytics.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics/reputation-movers:
+    get:
+      tags: [Analytics]
+      operationId: getReputationMovers
+      summary: Reputation gainers & losers
+      description: "Biggest net reputation gainers and losers, reconstructed from the event log — momentum, not just level. **Requires `read` scope.**"
+      parameters:
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 5, maximum: 50 } }
+      responses:
+        "200":
+          description: Reputation movers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/compare:
+    get:
+      tags: [Agents]
+      operationId: compareAgents
+      summary: Compare two agents side by side
+      description: "Side-by-side comparison of two agents across discovery score, reputation, credit, trust, revenue, fraud and dispute rate, with a per-metric and overall winner. **Requires `read` scope.**"
+      parameters:
+        - { name: a, in: query, required: true, schema: { type: string } }
+        - { name: b, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Comparison.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/discovery:
+    get:
+      tags: [Agents]
+      operationId: discoverAgents
+      summary: Discover and rank agents
+      description: "Buyer-facing agent ranking fusing reputation, creditworthiness, web-of-trust, tier and a fraud penalty into one 0..100 score. **Requires `read` scope.**"
+      parameters:
+        - { name: service_type, in: query, required: false, schema: { type: string }, description: Filter by service type. }
+        - { name: min_reputation, in: query, required: false, schema: { type: integer }, description: Minimum reputation. }
+        - { name: min_score, in: query, required: false, schema: { type: integer }, description: Minimum discovery score. }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        "200":
+          description: Ranked discovery results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/attestations:
+    post:
+      tags: [Agents]
+      operationId: createAttestation
+      summary: Issue a trust attestation (vouch)
+      description: "An established agent (reputation ≥ 60) vouches for another, granting a small anti-Sybil-capped reputation boost. **Requires `write` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string }
+                to: { type: string }
+                note: { type: string }
+      responses:
+        "200":
+          description: Attestation result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/attestations/graph:
+    get:
+      tags: [Agents]
+      operationId: getAttestationGraph
+      summary: Web-of-trust graph
+      description: "The full directed attestation graph: nodes with in/out degree and trust score, plus vouch edges. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Attestation graph.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/portfolio:
+    get:
+      tags: [Credit]
+      operationId: getPortfolioReport
+      summary: Portfolio & concentration-risk report
+      description: "LP-facing report: utilization, exposure by agent/service/tier/health, and a Herfindahl (HHI) concentration index over outstanding credit. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Portfolio report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/yield-projection:
+    get:
+      tags: [Credit]
+      operationId: getYieldProjection
+      summary: LP forward yield projection
+      description: "Forward LP yield over 30/90/365 days: gross interest, LP share after the protocol spread, expected loss, and projected net APY. A projection (assumption-driven), distinct from realized APY. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Yield projection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/operators/fleet-overview:
+    post:
+      tags: [Agents, Credit]
+      operationId: getFleetOverview
+      summary: Operator fleet overview
+      description: "One-call dashboard for an operator running many agents: each agent's discovery standing, credit readiness and current line. Unknown ids are flagged. **Requires `read` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_ids]
+              properties:
+                agent_ids: { type: array, items: { type: string }, maxItems: 200 }
+      responses:
+        "200":
+          description: Fleet overview.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/risk/alerts:
+    get:
+      tags: [Credit]
+      operationId: getRiskAlerts
+      summary: Risk monitoring alerts
+      description: "Always-on risk sweep: severity-ranked alerts (concentration, overdue lines, fraud exposure, frozen/defaulted lines, liquidity stress). **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Risk alert report.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/review-all:
+    post:
+      tags: [Credit]
+      operationId: reviewAllCreditLines
+      summary: Review every active credit line
+      description: "Periodic portfolio maintenance: re-underwrites every active line (ratchet-up only) and returns a summary of increased/held/ineligible. **Requires `admin` scope.**"
+      responses:
+        "200":
+          description: Review summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/lines/{id}/review:
+    post:
+      tags: [Credit]
+      operationId: reviewCreditLine
+      summary: Review (re-underwrite) a credit line
+      description: "Periodic re-underwriting: ratchets the limit UP when the agent now qualifies for more, holds otherwise, and never auto-reduces extended credit (reductions remain an explicit freeze). **Requires `write` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: The agent_id of the line. }
+      responses:
+        "200":
+          description: Review result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/offers:
+    get:
+      tags: [Credit]
+      operationId: listCreditOffers
+      summary: List credit pre-approval offers
+      description: "List credit offers, optionally filtered by agent. **Requires `read` scope.**"
+      parameters:
+        - { name: agent_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Array of offers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      tags: [Credit]
+      operationId: issueCreditOffer
+      summary: Issue a credit pre-approval offer
+      description: "Issue a time-bounded pre-approval offer with terms from the live underwriter. **Requires `write` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_id]
+              properties:
+                agent_id: { type: string }
+                ttl_seconds: { type: number, minimum: 60, description: Acceptance deadline (default 7 days). }
+                term_seconds: { type: number, minimum: 60, description: Term of the line once opened (default 30 days). }
+      responses:
+        "200":
+          description: The issued offer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/offers/{id}/accept:
+    post:
+      tags: [Credit]
+      operationId: acceptCreditOffer
+      summary: Accept a credit offer
+      description: "Accept a pending, unexpired offer — opens a credit line at the locked terms. **Requires `write` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The accepted offer and opened line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/offers/{id}/decline:
+    post:
+      tags: [Credit]
+      operationId: declineCreditOffer
+      summary: Decline a credit offer
+      description: "Decline a pending offer. **Requires `write` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The declined offer.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/simulate:
+    post:
+      tags: [Credit]
+      operationId: simulateCredit
+      summary: Simulate a credit decision (what-if)
+      description: "Read-only underwriting preview: runs the live risk policy + governance cap against hypothetical agent signals without registering an agent or mutating state. **Requires `read` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [monthly_revenue_cspr]
+              properties:
+                monthly_revenue_cspr: { type: number, minimum: 0, description: 30-day x402 revenue in CSPR. }
+                stake_cspr: { type: number, minimum: 0 }
+                reputation: { type: number, minimum: 0, maximum: 100 }
+                accuracy: { type: number, minimum: 0, maximum: 100 }
+                dispute_rate: { type: number, minimum: 0, maximum: 1 }
+                jobs_completed: { type: number, minimum: 0 }
+                service_type: { type: string }
+      responses:
+        "200":
+          description: Simulated credit decision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/receipts:
+    get:
+      tags: [Agents]
+      operationId: listReceipts
+      summary: List x402 receipts
+      description: "List all x402 receipts. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Array of receipts.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptListResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/x402/receipts/{id}:
+    get:
+      tags: [Agents]
+      operationId: getReceipt
+      summary: Get an x402 receipt
+      description: "Fetch a single x402 receipt by id. **Requires `read` scope.**"
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Receipt id.
+          schema: { type: string }
+          example: "rcpt_8f2a"
+      responses:
+        "200":
+          description: The receipt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceiptResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/pool:
+    get:
+      tags: [Credit]
+      operationId: getCreditPool
+      summary: Get the credit pool
+      description: "Pool state plus all credit lines. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Pool state and credit lines.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditPoolResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/economics:
+    get:
+      tags: [Analytics]
+      operationId: getEconomics
+      summary: Economics view
+      description: "Protocol economics view. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Economics view.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/marketplace:
+    get:
+      tags: [Marketplace]
+      operationId: getMarketplace
+      summary: Marketplace view
+      description: "Marketplace view. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Marketplace view.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/analytics:
+    get:
+      tags: [Analytics]
+      operationId: getAnalytics
+      summary: Protocol analytics
+      description: "Live protocol analytics read-model. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Analytics view.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyticsResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/notifications:
+    get:
+      tags: [Analytics]
+      operationId: getNotifications
+      summary: Notification feed
+      description: "Protocol notification feed. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Array of notifications.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationListResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/search:
+    get:
+      tags: [Analytics]
+      operationId: search
+      summary: Universal search
+      description: "Universal search across the ledger. **Requires `read` scope.**"
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search query. An empty query returns an empty array.
+          schema: { type: string }
+          example: "solar-oracle-1"
+      responses:
+        "200":
+          description: Array of search results.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/lines:
+    post:
+      tags: [Credit]
+      operationId: createCreditLine
+      summary: Underwrite a credit line
+      description: |
+        Underwrite a credit line for an agent and return the decision and line.
+        **Requires `write` scope.**
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCreditLineRequest"
+            example:
+              agent_id: "solar-oracle-1"
+              term_days: 30
+      responses:
+        "200":
+          description: Underwriting decision and the resulting credit line.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreditDecisionResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/lines/{id}/draw:
+    post:
+      tags: [Credit]
+      operationId: drawCreditLine
+      summary: Draw on a credit line
+      description: "Fund a draw from a credit line. **Requires `write` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/CreditLineId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountCsprRequest"
+            example:
+              amount_cspr: 1000
+      responses:
+        "200":
+          description: Draw result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/lines/{id}/repay:
+    post:
+      tags: [Credit]
+      operationId: repayCreditLine
+      summary: Repay a credit line
+      description: "Collect a repayment against a credit line. **Requires `write` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/CreditLineId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AmountCsprRequest"
+            example:
+              amount_cspr: 250
+      responses:
+        "200":
+          description: Repayment result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/disputes:
+    post:
+      tags: [Disputes]
+      operationId: openDispute
+      summary: Open a dispute
+      description: "Open a dispute against a respondent agent. **Requires `write` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenDisputeRequest"
+            example:
+              respondent_agent: "solar-oracle-1"
+              dispute_type: "fake_receipt"
+              receipt_id: "rcpt_8f2a"
+              note: "evidence hash does not match observed output"
+      responses:
+        "200":
+          description: The opened dispute.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/realfi:
+    get:
+      tags: [RealFi]
+      operationId: getRealfiState
+      summary: RealFi state
+      description: "RealFi protocol state. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: RealFi state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/realfi/operators:
+    post:
+      tags: [RealFi]
+      operationId: verifyOperator
+      summary: Verify a RealFi operator
+      description: "Verify a RealFi operator. **Requires `write` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOperatorRequest"
+            example:
+              operator_id: "op-acme-energy"
+              verification_level: "business_verified"
+              jurisdiction: "US"
+              verification_reference: "kyb-ref-001"
+      responses:
+        "200":
+          description: Verified operator.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/realfi/fiat-receipts:
+    post:
+      tags: [RealFi]
+      operationId: recordFiatReceipt
+      summary: Record a fiat receipt
+      description: "Record a fiat receipt for a seller agent. **Requires `write` scope.**"
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FiatReceiptRequest"
+            example:
+              seller_agent: "solar-oracle-1"
+              operator_id: "op-acme-energy"
+              amount: "100.00"
+              currency: "USD"
+              service_type: "rwa.weather_risk"
+              provider_event_id: "evt_001"
+              provider_receipt_id: "prcpt_001"
+      responses:
+        "200":
+          description: Recorded fiat receipt.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/admin/api-keys:
+    get:
+      tags: [Admin]
+      operationId: listApiKeys
+      summary: List API keys
+      description: "List API key metadata (never the secret/hash). **Requires `admin` scope.**"
+      responses:
+        "200":
+          description: Array of API key metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyListResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      tags: [Admin]
+      operationId: issueApiKey
+      summary: Issue an API key
+      description: |
+        Mint a new scoped API key. The full secret is returned **once** and never
+        stored. **Requires `admin` scope.**
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueApiKeyRequest"
+            example:
+              name: "ci-pipeline"
+              scopes: ["read", "write"]
+      responses:
+        "200":
+          description: The issued key (secret returned once).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssuedKeyResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/webhooks/deliveries:
+    get:
+      tags: [System]
+      operationId: getWebhookDeliveries
+      summary: Recent webhook delivery attempts
+      description: "The recent webhook delivery log (delivered/failed, http status, attempts) for integrator debugging, optionally filtered by subscription. **Requires `admin` scope.**"
+      parameters:
+        - { name: subscription_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200":
+          description: Delivery attempts (newest first).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/webhooks:
+    get:
+      tags: [Admin]
+      operationId: listWebhooks
+      summary: List webhook subscriptions
+      description: "List webhook subscriptions (never the secret). **Requires `admin` scope.**"
+      responses:
+        "200":
+          description: Array of webhook subscriptions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookListResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      tags: [Admin]
+      operationId: subscribeWebhook
+      summary: Subscribe a webhook
+      description: |
+        Subscribe an HTTP(S) endpoint to protocol events. The subscription secret
+        is returned once. **Requires `admin` scope.**
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeWebhookRequest"
+            example:
+              url: "https://example.com/cred402/hooks"
+              events: ["*"]
+      responses:
+        "200":
+          description: The created webhook subscription.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: "API key presented as `Authorization: Bearer <key>`."
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Api-Key
+      description: "API key presented in the `X-Api-Key` header."
+
+  parameters:
+    AgentId:
+      name: id
+      in: path
+      required: true
+      description: Agent id.
+      schema:
+        type: string
+        minLength: 2
+        maxLength: 64
+      example: "solar-oracle-1"
+    CreditLineId:
+      name: id
+      in: path
+      required: true
+      description: Credit line / agent id the line belongs to.
+      schema: { type: string }
+      example: "solar-oracle-1"
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Optional idempotency key for safe retries of this mutation. When present,
+        a replayed request with the same key and identical body returns the
+        original stored response instead of re-running the handler.
+      schema: { type: string }
+      example: "idem-7f3c9a21"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "unauthorized", message: "missing or invalid API key" }
+            request_id: "req_9f12ab34cd56ef78"
+    Forbidden:
+      description: API key lacks the required scope.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "forbidden", message: "requires 'write' scope" }
+            request_id: "req_9f12ab34cd56ef78"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "not_found", message: "agent not found" }
+            request_id: "req_9f12ab34cd56ef78"
+    ValidationError:
+      description: Request body failed validation (or was not valid JSON).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "validation_error", message: "agent_id: shorter than 2" }
+            request_id: "req_9f12ab34cd56ef78"
+    Unprocessable:
+      description: Domain invariant violation (e.g. ledger rejected the operation).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "unprocessable", message: "credit line is frozen" }
+            request_id: "req_9f12ab34cd56ef78"
+    RateLimited:
+      description: Rate limit exceeded.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+          example:
+            success: false
+            error: { code: "rate_limited", message: "rate limit exceeded" }
+            request_id: "req_9f12ab34cd56ef78"
+
+  schemas:
+    # -- envelope -------------------------------------------------------------
+    RequestId:
+      type: string
+      description: Per-request id, also returned as the X-Request-Id header.
+      example: "req_9f12ab34cd56ef78"
+    ApiError:
+      type: object
+      description: The failure envelope returned for every error.
+      required: [success, error, request_id]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+              enum:
+                - not_found
+                - validation_error
+                - invalid_json
+                - unauthorized
+                - forbidden
+                - conflict
+                - rate_limited
+                - unprocessable
+                - internal_error
+            message:
+              type: string
+              description: Human-readable error message.
+        request_id:
+          $ref: "#/components/schemas/RequestId"
+
+    # -- domain payloads ------------------------------------------------------
+    Agent:
+      type: object
+      description: A registered agent (canonical ledger record).
+      properties:
+        agent_id: { type: string, example: "solar-oracle-1" }
+        service_type:
+          $ref: "#/components/schemas/ServiceType"
+        reputation_score: { type: integer, example: 80 }
+        credit_score: { type: integer, example: 640 }
+        dispute_rate: { type: number, example: 0.0 }
+      additionalProperties: true
+
+    Passport:
+      type: object
+      description: An agent passport (identity + reputation + credit summary).
+      additionalProperties: true
+
+    CreditLine:
+      type: object
+      description: A credit line. Mote amounts are decimal strings.
+      properties:
+        agent_id: { type: string, example: "solar-oracle-1" }
+        status: { type: string, example: "active" }
+        max_credit: { type: string, description: "Mote amount (decimal string).", example: "5000000000000" }
+        drawn: { type: string, description: "Mote amount (decimal string).", example: "1000000000000" }
+      additionalProperties: true
+
+    PoolState:
+      type: object
+      description: Credit pool state. Mote amounts are decimal strings.
+      properties:
+        total_liquidity: { type: string, example: "100000000000000" }
+        outstanding_credit: { type: string, example: "25000000000000" }
+        interest_accrued: { type: string, example: "120000000000" }
+        defaults: { type: integer, example: 0 }
+      additionalProperties: true
+
+    Receipt:
+      type: object
+      description: An x402 receipt. The `amount` is a mote decimal string.
+      properties:
+        receipt_id: { type: string, example: "rcpt_8f2a" }
+        payer_agent: { type: string, example: "buyer-1" }
+        seller_agent: { type: string, example: "solar-oracle-1" }
+        amount: { type: string, description: "Mote amount (decimal string).", example: "1000000000" }
+        status: { type: string, example: "finalized" }
+      additionalProperties: true
+
+    ServiceType:
+      type: string
+      description: Agent service type.
+      enum:
+        - solar_output_verification
+        - weather_risk
+        - receivable_quality
+        - risk_scoring
+        - treasury_routing
+        - monitoring
+      example: "solar_output_verification"
+
+    VerificationLevel:
+      type: string
+      description: RealFi operator verification level.
+      enum:
+        - unverified
+        - email_verified
+        - business_verified
+        - regulated_entity
+      example: "business_verified"
+
+    DisputeType:
+      type: string
+      description: Dispute classification.
+      enum:
+        - bad_evidence
+        - fake_receipt
+        - non_delivery
+        - agent_default
+        - collusion
+      example: "bad_evidence"
+
+    Scope:
+      type: string
+      enum: [read, write, admin]
+
+    HealthData:
+      type: object
+      required: [ok, env, policy]
+      properties:
+        ok: { type: boolean, const: true }
+        env: { type: string, example: "production" }
+        policy: { type: string, description: "Active risk policy version.", example: "v3" }
+
+    AnalyticsView:
+      type: object
+      description: Live protocol analytics read-model.
+      required: [generated_at, totals, pool, x402, risk, leaderboard, credit_timeline]
+      properties:
+        generated_at: { type: integer, description: "Epoch ms.", example: 1718539200000 }
+        totals:
+          type: object
+          required:
+            [agents, receipts, finalized_receipts, evidence, verified_evidence, rwa_assets, disputes, open_disputes, fiat_receipts]
+          properties:
+            agents: { type: integer, example: 12 }
+            receipts: { type: integer, example: 340 }
+            finalized_receipts: { type: integer, example: 300 }
+            evidence: { type: integer, example: 88 }
+            verified_evidence: { type: integer, example: 80 }
+            rwa_assets: { type: integer, example: 15 }
+            disputes: { type: integer, example: 3 }
+            open_disputes: { type: integer, example: 1 }
+            fiat_receipts: { type: integer, example: 9 }
+        pool:
+          type: object
+          required: [tvl_motes, outstanding_motes, interest_accrued_motes, utilization, open_credit_lines, defaults]
+          properties:
+            tvl_motes: { type: string, example: "100000000000000" }
+            outstanding_motes: { type: string, example: "25000000000000" }
+            interest_accrued_motes: { type: string, example: "120000000000" }
+            utilization: { type: number, example: 0.25 }
+            open_credit_lines: { type: integer, example: 8 }
+            defaults: { type: integer, example: 0 }
+        x402:
+          type: object
+          required: [total_volume_motes, avg_receipt_motes, settled_rate]
+          properties:
+            total_volume_motes: { type: string, example: "340000000000" }
+            avg_receipt_motes: { type: string, example: "1000000000" }
+            settled_rate: { type: number, example: 0.97 }
+        risk:
+          type: object
+          required: [avg_reputation, avg_credit_score, high_fraud_agents, avg_dispute_rate]
+          properties:
+            avg_reputation: { type: integer, example: 78 }
+            avg_credit_score: { type: integer, example: 632 }
+            high_fraud_agents: { type: integer, example: 0 }
+            avg_dispute_rate: { type: number, example: 0.01 }
+        leaderboard:
+          type: array
+          items: { $ref: "#/components/schemas/AgentLeaderRow" }
+        credit_timeline:
+          type: array
+          items: { $ref: "#/components/schemas/TimelinePoint" }
+
+    AgentLeaderRow:
+      type: object
+      required:
+        [agent_id, service_type, reputation, credit_score, revenue_motes, receipts, credit_line_motes, fraud_score]
+      properties:
+        agent_id: { type: string, example: "solar-oracle-1" }
+        service_type: { type: string, example: "solar_output_verification" }
+        reputation: { type: integer, example: 80 }
+        credit_score: { type: integer, example: 640 }
+        revenue_motes: { type: string, example: "120000000000" }
+        receipts: { type: integer, example: 42 }
+        credit_line_motes: { type: string, example: "5000000000000" }
+        fraud_score: { type: integer, example: 5 }
+
+    TimelinePoint:
+      type: object
+      required: [seq, event]
+      properties:
+        seq: { type: integer, example: 1024 }
+        event: { type: string, example: "CreditDrawn" }
+        agent_id: { type: string, example: "solar-oracle-1" }
+        amount_motes: { type: string, example: "1000000000000" }
+
+    Notification:
+      type: object
+      required: [id, seq, severity, title, detail, timestamp]
+      properties:
+        id: { type: string, example: "ntf-1024" }
+        seq: { type: integer, example: 1024 }
+        severity:
+          type: string
+          enum: [info, success, warning, critical]
+          example: "success"
+        title: { type: string, example: "Credit line approved" }
+        detail: { type: string, example: "solar-oracle-1 · up to 5000.00 CSPR" }
+        agent_id: { type: string, example: "solar-oracle-1" }
+        timestamp: { type: integer, description: "Epoch ms.", example: 1718539200000 }
+
+    SearchResult:
+      type: object
+      required: [kind, id, label, detail]
+      properties:
+        kind:
+          type: string
+          enum: [agent, receipt, evidence, asset, credit_line, dispute, transaction]
+          example: "agent"
+        id: { type: string, example: "solar-oracle-1" }
+        label: { type: string, example: "solar-oracle-1" }
+        detail: { type: string, example: "solar_output_verification · rep 80 · score 640" }
+
+    ApiKeyRecordPublic:
+      type: object
+      description: Public API key metadata (the secret/hash is never included).
+      required: [id, name, scopes, created_at]
+      properties:
+        id: { type: string, example: "k_a1b2c3d4e5f6" }
+        name: { type: string, example: "ci-pipeline" }
+        scopes:
+          type: array
+          items: { $ref: "#/components/schemas/Scope" }
+          example: ["read", "write"]
+        created_at: { type: integer, description: "Epoch ms.", example: 1718539200000 }
+        revoked_at: { type: integer, description: "Epoch ms; present when revoked." }
+        last_used_at: { type: integer, description: "Epoch ms; present after first use." }
+
+    IssuedKey:
+      type: object
+      description: A freshly issued key. The secret is returned ONCE.
+      required: [id, secret, scopes]
+      properties:
+        id: { type: string, example: "k_a1b2c3d4e5f6" }
+        secret:
+          type: string
+          description: The full secret, shown once and never stored.
+          example: "c402_k_a1b2c3d4e5f6_Xy7Z..."
+        scopes:
+          type: array
+          items: { $ref: "#/components/schemas/Scope" }
+          example: ["read", "write"]
+
+    WebhookSubscriptionPublic:
+      type: object
+      description: Webhook subscription metadata (the secret is never listed).
+      required: [id, url, events, created_at]
+      properties:
+        id: { type: string, example: "wh_a1b2c3d4e5f6" }
+        url: { type: string, format: uri, example: "https://example.com/cred402/hooks" }
+        events:
+          type: array
+          items: { type: string }
+          example: ["*"]
+        created_at: { type: integer, description: "Epoch ms.", example: 1718539200000 }
+        disabled_at: { type: integer, description: "Epoch ms; present when disabled." }
+
+    WebhookSubscriptionWithSecret:
+      allOf:
+        - $ref: "#/components/schemas/WebhookSubscriptionPublic"
+        - type: object
+          required: [secret]
+          properties:
+            secret:
+              type: string
+              description: The signing secret, returned at subscription time.
+              example: "whsec_Xy7Z..."
+
+    # -- request bodies -------------------------------------------------------
+    RegisterAgentRequest:
+      type: object
+      required: [agent_id, service_type]
+      properties:
+        agent_id:
+          type: string
+          minLength: 2
+          maxLength: 64
+          example: "solar-oracle-1"
+        service_type:
+          $ref: "#/components/schemas/ServiceType"
+        agent_public_key:
+          type: string
+          maxLength: 130
+          default: "01"
+          example: "01"
+        owner_public_key:
+          type: string
+          maxLength: 130
+          default: "01"
+          example: "01"
+      additionalProperties: false
+
+    CreateCreditLineRequest:
+      type: object
+      required: [agent_id]
+      properties:
+        agent_id:
+          type: string
+          minLength: 2
+          example: "solar-oracle-1"
+        term_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          example: 30
+      additionalProperties: false
+
+    AmountCsprRequest:
+      type: object
+      required: [amount_cspr]
+      properties:
+        amount_cspr:
+          type: number
+          minimum: 0
+          description: Amount in CSPR.
+          example: 1000
+      additionalProperties: false
+
+    OpenDisputeRequest:
+      type: object
+      required: [respondent_agent]
+      properties:
+        respondent_agent:
+          type: string
+          minLength: 2
+          example: "solar-oracle-1"
+        dispute_type:
+          allOf:
+            - $ref: "#/components/schemas/DisputeType"
+          default: "bad_evidence"
+        receipt_id:
+          type: string
+          example: "rcpt_8f2a"
+        note:
+          type: string
+          maxLength: 500
+          default: "opened via v1 API"
+          example: "evidence hash does not match observed output"
+      additionalProperties: false
+
+    VerifyOperatorRequest:
+      type: object
+      required: [operator_id, verification_reference]
+      properties:
+        operator_id:
+          type: string
+          minLength: 2
+          example: "op-acme-energy"
+        verification_level:
+          allOf:
+            - $ref: "#/components/schemas/VerificationLevel"
+          default: "business_verified"
+        jurisdiction:
+          type: string
+          minLength: 2
+          maxLength: 2
+          default: "US"
+          description: ISO 3166-1 alpha-2 jurisdiction code.
+          example: "US"
+        verification_reference:
+          type: string
+          minLength: 1
+          example: "kyb-ref-001"
+      additionalProperties: false
+
+    FiatReceiptRequest:
+      type: object
+      required: [seller_agent, operator_id, amount, provider_event_id, provider_receipt_id]
+      properties:
+        seller_agent:
+          type: string
+          minLength: 2
+          example: "solar-oracle-1"
+        operator_id:
+          type: string
+          minLength: 2
+          example: "op-acme-energy"
+        amount:
+          type: string
+          pattern: '^\d+(\.\d+)?$'
+          description: Decimal money string.
+          example: "100.00"
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: "USD"
+          example: "USD"
+        service_type:
+          type: string
+          default: "rwa.weather_risk"
+          example: "rwa.weather_risk"
+        provider_event_id:
+          type: string
+          minLength: 1
+          example: "evt_001"
+        provider_receipt_id:
+          type: string
+          minLength: 1
+          example: "prcpt_001"
+      additionalProperties: false
+
+    IssueApiKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: "ci-pipeline"
+        scopes:
+          type: array
+          maxItems: 3
+          items: { $ref: "#/components/schemas/Scope" }
+          example: ["read", "write"]
+      additionalProperties: false
+
+    SubscribeWebhookRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          minLength: 8
+          description: HTTP(S) endpoint that will receive signed event deliveries.
+          example: "https://example.com/cred402/hooks"
+        events:
+          type: array
+          maxItems: 50
+          default: ["*"]
+          items: { type: string }
+          description: Event names to subscribe to, or ["*"] for all.
+          example: ["*"]
+      additionalProperties: false
+
+    # -- success-envelope wrappers -------------------------------------------
+    GenericObjectResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { type: object, additionalProperties: true }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    HealthResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/HealthData" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    AgentListResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Agent" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    AgentResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/Agent" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    PassportResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/Passport" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    CreditLineResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/CreditLine" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    CreditDecisionResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          required: [decision, line]
+          properties:
+            decision: { type: object, additionalProperties: true }
+            line: { $ref: "#/components/schemas/CreditLine" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    ReceiptListResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Receipt" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    ReceiptResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/Receipt" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    CreditPoolResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          allOf:
+            - $ref: "#/components/schemas/PoolState"
+            - type: object
+              required: [creditLines]
+              properties:
+                creditLines:
+                  type: array
+                  items: { $ref: "#/components/schemas/CreditLine" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    AnalyticsResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/AnalyticsView" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    NotificationListResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    SearchResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/SearchResult" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    ApiKeyListResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/ApiKeyRecordPublic" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    IssuedKeyResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/IssuedKey" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    WebhookListResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/WebhookSubscriptionPublic" }
+        request_id: { $ref: "#/components/schemas/RequestId" }
+
+    WebhookSubscriptionResponse:
+      type: object
+      required: [success, data, request_id]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/WebhookSubscriptionWithSecret" }
+        request_id: { $ref: "#/components/schemas/RequestId" }

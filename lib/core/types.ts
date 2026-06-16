@@ -171,6 +171,7 @@ export type EventName =
   | "DisputeClosed"
   | "StakeSlashedToVault"
   | "SlashDistributed"
+  | "InsuranceClaimPaid"
   | "GovernanceParameterUpdated"
   | "ProtocolPaused"
   | "ProtocolUnpaused"
@@ -192,7 +193,11 @@ export type EventName =
   | "OperatorVerified"
   | "OperatorVerificationRevoked"
   | "RealFiAttestationRecorded"
-  | "RealFiAttestationRevoked";
+  | "RealFiAttestationRevoked"
+  // credit pre-approval offers
+  | "CreditOfferIssued"
+  | "CreditOfferAccepted"
+  | "CreditOfferDeclined";
 
 export interface ChainEvent {
   seq: number;

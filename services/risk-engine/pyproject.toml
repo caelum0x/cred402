@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cred402-risk-engine"
+version = "0.1.0"
+description = "Advisory risk + fraud microservice for the Cred402 protocol (p2 §7.6 Risk Engine, §7.8 Fraud Service). Standard library only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Cred402" }]
+keywords = ["cred402", "risk", "fraud", "credit-scoring", "x402"]
+
+# Intentionally ZERO runtime dependencies. The whole service runs on the
+# Python standard library (http.server, json, urllib.request, math,
+# dataclasses, statistics) so it deploys with no pip install step.
+dependencies = []
+
+[project.scripts]
+cred402-risk = "cli:main"
+
+[project.urls]
+Homepage = "https://github.com/cred402/cred402"
+
+[tool.setuptools]
+packages = ["cred402_risk"]

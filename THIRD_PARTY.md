@@ -14,6 +14,15 @@ product.
 | `paulmillr/noble-curves` (`@noble/curves`) | secp256k1 keys/signatures for EVM address bindings + relayer proofs | MIT | `lib/x402/evm.ts`, `crosschain/` | Dependency |
 | `paulmillr/noble-hashes` (`@noble/hashes`) | blake2b-256 (Casper content hashing) + keccak256 | MIT | `lib/core/hash.ts`, `lib/x402/` | Dependency |
 | `odradev/odra` | Casper smart-contract framework (Wasm) | MIT | `contracts/*` (14 Odra crates) | Framework dependency |
+| `casper-ecosystem/casper-js-sdk` | byte-exact Casper 2.0 deploy build/sign/submit + WASM install (p8 real Testnet write path) | Apache-2.0 | `lib/casper/sdk_signer.ts`, `lib/casper/install.ts`, `scripts/deploy_testnet.ts` | Dependency (lazy-loaded on the live path only) |
+| `modelcontextprotocol/typescript-sdk` (`@modelcontextprotocol/sdk`) | official MCP server transport for the 32-tool registry (p9) | MIT | `mcp/server_sdk.ts`, tested via the SDK client in `test/mcp_sdk.test.ts` | Dependency |
+| `make-software/casper-x402` | canonical Casper x402 facilitator (x402 V2) — verify/settle client (p9) | Apache-2.0 | `lib/x402/facilitator.ts` (client to the facilitator service) | Wire-contract client; facilitator runs as a sidecar |
+| `casper-ecosystem/casper-eip-712` (`@casper-ecosystem/casper-eip-712`) | real EIP-712 typed-data digest for x402 payment authorizations | Apache-2.0 | `lib/x402/eip712.ts` (signed digest used by `lib/x402/x402.ts`) | Dependency |
+| `casper-network/casper-sidecar` | live node event feed (SSE `/events`) consumed for WatchdogAgent/indexer | Apache-2.0 | `lib/casper/sidecar.ts`, `scripts/sidecar_watch.ts` | Faithful SSE client to the Sidecar service |
+| `stripe/stripe-node` (`stripe`) | real test-mode webhook HMAC verification + event mapping → on-chain fiat receipts (p10) | MIT | `lib/realfi/stripe.ts` | Dependency |
+| `plaid/plaid-node` (`plaid`) | real sandbox bank verification → Bank Verification Envelope (p10) | MIT | `lib/realfi/plaid.ts` | Dependency |
+| `foundry-rs/foundry` + `forge-std` | real EVM satellite compile + Base Sepolia deploy (p10) | Apache-2.0/MIT | `contracts/evm/` (`forge build`, `script/Deploy.s.sol`) | Build/deploy tool; `forge-std` vendored + gitignored |
+| Casper Wallet (`make-software`) | real browser-extension connect + message/deploy signing in the console | Apache-2.0 | `frontend/src/lib/casperWallet.ts`, `hooks/useCasperWallet.ts`, `components/WalletButton.tsx` | Typed wrapper over the extension's injected `window.CasperWalletProvider` (no npm dep) |
 | `privatenumber/tsx` | TypeScript execute/runtime for CLI + demos | MIT | dev tooling, `scripts/*` | Dev dependency |
 | `microsoft/TypeScript` | Type system + `tsc` typecheck | Apache-2.0 | whole repo | Dev dependency |
 | `vitejs/vite` + `facebook/react` | Console dashboard build + UI | MIT | `frontend/` | UI dependency |
@@ -22,22 +31,14 @@ product.
 
 ## Designed-for integration (not yet wired in this repo)
 
-These are part of the production blueprint (`docs/p2.md`, `docs/p6.md`, `docs/p7.md`).
+These are part of the production blueprint (see `PRODUCTION.md` and the real-integration phase docs `docs/p8.md`–`docs/p10.md`).
 The Cred402 protocol they wrap is implemented here; the integrations below are the
 deployment/forking surface and are tracked in `ROADMAP.md`.
 
 | Project | Use | License | Planned location | Notes |
 |---|---|---|---|---|
-| `make-software/casper-x402` | x402 facilitator + paid-server base | Apache-2.0 | `services/facilitator-go`, `services/x402-gateway` | Cred402 receipt/evidence hooks |
-| `casper-ecosystem/casper-js-sdk` | Casper Testnet interaction (replaces in-memory ledger transport) | Apache-2.0 | `packages/ts-sdk`, `apps/console` | Drop-in behind the ledger interface |
-| `casper-ecosystem/casper-eip-712` | Typed agent authorizations | see repo | `packages/typed-authorizations` | Cred402 typed messages |
-| `make-software/casper-wallet-sdk`, `cspr-design` | Wallet + UI components | see repo | `apps/console` | UI/wallet |
-| `casper-network/casper-sidecar` | Event stream/indexing input | see repo | `services/event-indexer` | Replaces SSE stand-in |
-| `modelcontextprotocol/typescript-sdk` | MCP server SDK | MIT | `mcp/` | Current MCP server is a zero-dep JSON-RPC impl |
+| `make-software/cspr-design` | Casper-native UI component kit | see repo | `frontend/` | Optional reskin of the existing console |
 | `openai/openai-agents-python`, `langchain-ai/langgraph` | Python agent runtime + durable workflows | MIT | `services/agent-orchestrator` | TS agents implemented here |
-| `stripe-samples/accept-a-payment` | Stripe adapter starter | MIT | `lib/services/realfi_bridge.ts` examples | RealFi Bridge owns the on-chain commitment path |
-| `plaid/quickstart` | Plaid bank-data starter | MIT | RealFi Bridge examples | Bank Verification Envelope flow |
-| OpenZeppelin Contracts, Foundry | EVM satellite contracts + tooling | MIT | `contracts/evm` | Satellite mirrors |
 
 When a project is forked rather than depended on, its `LICENSE` is preserved under
 `third_party/<project>/LICENSE` and any forked service keeps a `NOTICE` file.

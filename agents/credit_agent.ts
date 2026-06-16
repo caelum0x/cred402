@@ -6,6 +6,7 @@ import { FraudService } from "../lib/services/fraud_service.js";
 import { reasonCodesFromInputs } from "../lib/core/reason_codes.js";
 import { realfiCreditSignal } from "../lib/services/realfi_credit.js";
 import { ComplianceService } from "../lib/compliance/service.js";
+import { computeTier } from "../lib/services/reputation_tiers.js";
 
 /**
  * CreditAgent — the underwriter. It reads an agent's x402 receipt history, runs
@@ -67,7 +68,12 @@ export class CreditAgent {
     const operator_id = this.ledger.buildPassport(agent_id)?.operator;
     const realfi = realfiCreditSignal(this.ledger, agent_id, operator_id);
     const realfiAdjusted = scaleMotes(fraudCapped, realfi.multiplier);
-    const capped = realfiAdjusted > gov.max_agent_exposure ? gov.max_agent_exposure : realfiAdjusted;
+    // Reputation-tier perk: higher tiers get a real credit-capacity multiplier.
+    const tier = computeTier(this.ledger, agent_id);
+    const tierMult = "tier" in tier ? tier.credit_multiplier : 1;
+    if ("tier" in tier && tierMult !== 1) decision.rationale.push(`${tier.tier} tier perk x${tierMult.toFixed(2)}`);
+    const tierAdjusted = scaleMotes(realfiAdjusted, tierMult);
+    const capped = tierAdjusted > gov.max_agent_exposure ? gov.max_agent_exposure : tierAdjusted;
     if (realfi.multiplier !== 1.0) {
       decision.rationale.push(`realfi factor x${realfi.multiplier.toFixed(2)} (operator/fiat/bank signals)`);
     }
@@ -141,7 +147,9 @@ export class CreditAgent {
     const fraudCapped = scaleMotes(decision.credit_line, fraudFactor);
     const operator_id = this.ledger.buildPassport(agent_id)?.operator;
     const realfi = realfiCreditSignal(this.ledger, agent_id, operator_id);
-    const projected = scaleMotes(fraudCapped, realfi.multiplier);
+    const realfiProjected = scaleMotes(fraudCapped, realfi.multiplier);
+    const tier = computeTier(this.ledger, agent_id);
+    const projected = scaleMotes(realfiProjected, "tier" in tier ? tier.credit_multiplier : 1);
     const capped = projected > gov.max_agent_exposure ? gov.max_agent_exposure : projected;
     decision.credit_line = capped;
 

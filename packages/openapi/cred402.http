@@ -1,0 +1,241 @@
+### Cred402 API — REST Client collection (VS Code REST Client / IntelliJ .http)
+### Set @base and @key, then click "Send Request" above any block.
+
+@base = http://localhost:4021
+@key = c402_replace_me
+
+### --- system ---
+GET {{base}}/v1/health
+
+###
+GET {{base}}/metrics
+
+### --- sign in with casper wallet ---
+POST {{base}}/v1/auth/wallet/challenge
+Content-Type: application/json
+
+{ "account": "01<64-hex-ed25519-pubkey>" }
+
+###
+POST {{base}}/v1/auth/wallet/verify
+Content-Type: application/json
+
+{ "nonce": "<from-challenge>", "signature": "<wallet-ed25519-sig-hex>" }
+
+### --- agents ---
+GET {{base}}/v1/agents?limit=50
+
+###
+GET {{base}}/v1/agents?service_type=solar_output_verification
+
+###
+GET {{base}}/v1/agents/EvidenceSellerAgent
+
+###
+GET {{base}}/v1/agents/EvidenceSellerAgent/credit-explain
+
+###
+GET {{base}}/v1/agents/EvidenceSellerAgent/credit-report
+
+###
+GET {{base}}/v1/agents/EvidenceSellerAgent/profile
+
+###
+POST {{base}}/v1/agents
+Authorization: Bearer {{key}}
+Content-Type: application/json
+Idempotency-Key: reg-weather-1
+
+{ "agent_id": "WeatherRiskAgent", "service_type": "weather_risk" }
+
+### --- credit ---
+GET {{base}}/v1/credit/pool
+
+###
+POST {{base}}/v1/credit/lines
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "agent_id": "EvidenceSellerAgent" }
+
+###
+POST {{base}}/v1/credit/lines/EvidenceSellerAgent/draw
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "amount_cspr": 6 }
+
+###
+POST {{base}}/v1/credit/underwrite-batch
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "agent_ids": ["EvidenceSellerAgent", "WeatherRiskAgent"] }
+
+### --- marketplace + commerce ---
+GET {{base}}/v1/marketplace
+
+###
+POST {{base}}/v1/marketplace/purchase
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "listing_id": "lst-0001", "buyer_agent": "WeatherRiskAgent" }
+
+### --- realfi ---
+POST {{base}}/v1/realfi/operators
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "operator_id": "operator:acme", "jurisdiction": "US", "verification_level": "business_verified", "verification_reference": "kyb-ref-1" }
+
+### --- compliance + analytics ---
+GET {{base}}/v1/compliance/agents/EvidenceSellerAgent
+
+###
+GET {{base}}/v1/analytics
+
+###
+GET {{base}}/v1/search?q=SOLAR
+
+### --- admin (needs admin scope) ---
+POST {{base}}/v1/admin/api-keys
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "name": "my-integration", "scopes": ["read", "write"] }
+
+###
+POST {{base}}/v1/webhooks
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "url": "https://example.com/cred402-hook", "events": ["*"] }
+
+### --- graphql ---
+POST {{base}}/graphql
+Content-Type: application/json
+
+{ "query": "{ agents { agent_id reputation_score credit_score } analytics }" }
+
+### --- DeFi pool: LP positions, deposit/withdraw, interest ---
+GET {{base}}/v1/credit/lp
+
+###
+POST {{base}}/v1/credit/deposit
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "amount_cspr": 500 }
+
+###
+POST {{base}}/v1/credit/withdraw
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "amount_cspr": 100 }
+
+###
+GET {{base}}/v1/credit/health
+
+### --- lifecycle: stake, dispute verdict, insurance, decay, freeze (admin) ---
+POST {{base}}/v1/agents/EvidenceSellerAgent/stake
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "amount_cspr": 50 }
+
+###
+POST {{base}}/v1/insurance/claim
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "claimant": "LP-1", "amount_cspr": 1, "reason": "default reimbursement" }
+
+###
+POST {{base}}/v1/admin/advance-clock
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "seconds": 2592000 }
+
+###
+POST {{base}}/v1/reputation/decay
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "assume_inactive_days": 30 }
+
+###
+POST {{base}}/v1/credit/lines/EvidenceSellerAgent/freeze
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "reason": "risk review" }
+
+### --- bureau analytics: discovery, trust, compliance, portfolio, benchmark, history ---
+GET {{base}}/v1/discovery?service_type=weather_risk
+
+###
+GET {{base}}/v1/attestations/graph
+
+###
+POST {{base}}/v1/attestations
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "from": "EvidenceSellerAgent", "to": "WeatherRiskAgent", "note": "reliable" }
+
+###
+GET {{base}}/v1/compliance/report
+
+###
+GET {{base}}/v1/credit/portfolio
+
+###
+GET {{base}}/v1/risk/alerts
+
+###
+GET {{base}}/v1/credit/yield-projection
+
+###
+GET {{base}}/v1/agents/WeatherRiskAgent/benchmark
+
+###
+GET {{base}}/v1/agents/WeatherRiskAgent/history
+
+###
+GET {{base}}/v1/agents/WeatherRiskAgent/readiness
+
+###
+GET {{base}}/v1/agents/WeatherRiskAgent/score-trend
+
+### --- operators ---
+POST {{base}}/v1/operators/fleet-overview
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "agent_ids": ["EvidenceSellerAgent", "WeatherRiskAgent"] }
+
+### --- credit: what-if simulation + pre-approval offers ---
+POST {{base}}/v1/credit/simulate
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "monthly_revenue_cspr": 5000, "reputation": 85, "stake_cspr": 200 }
+
+###
+POST {{base}}/v1/credit/offers
+Authorization: Bearer {{key}}
+Content-Type: application/json
+
+{ "agent_id": "WeatherRiskAgent" }
+
+###
+GET {{base}}/v1/credit/offers
+
+###
+# POST {{base}}/v1/credit/offers/<offer_id>/accept
+
+### --- x402 (machine-to-machine payment) ---
+GET {{base}}/verify/energy_output?rwa_id=SOLAR-A17

@@ -51,6 +51,24 @@ export class Gateway {
     }
   }
 
+  private readonly httpCounters = new Map<string, number>();
+
+  /** Count a handled request by coarse route + status (for /metrics). */
+  recordHttp(route: string, status: number): void {
+    const k = `${route}|${status}`;
+    this.httpCounters.set(k, (this.httpCounters.get(k) ?? 0) + 1);
+  }
+
+  /** Prometheus lines for HTTP request counts (appended to /metrics). */
+  httpMetrics(): string {
+    const lines = ["# HELP cred402_http_requests_total v1 requests by route+status", "# TYPE cred402_http_requests_total counter"];
+    for (const [k, v] of [...this.httpCounters.entries()].sort()) {
+      const [route, status] = k.split("|");
+      lines.push(`cred402_http_requests_total{route="${route}",status="${status}"} ${v}`);
+    }
+    return lines.join("\n");
+  }
+
   newRequestId(): string {
     return "req_" + randomBytes(8).toString("hex");
   }
@@ -73,8 +91,9 @@ export class Gateway {
     return { key, identity: `key:${key.id}` };
   }
 
-  enforceRateLimit(identity: string): void {
+  enforceRateLimit(identity: string): { remaining: number; limit: number } {
     const r = this.rateLimiter.check(identity);
     if (!r.allowed) throw new RateLimitError(r.retryAfterMs);
+    return { remaining: r.remaining, limit: this.config.rateLimit.maxRequests };
   }
 }

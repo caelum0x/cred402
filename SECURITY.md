@@ -1,11 +1,11 @@
 # Security
 
 Cred402 is hackathon/research software. Do not use it with real funds or real
-KYC/lending without an audit. See `docs/p2.md` §14 for the full threat model.
+KYC/lending without an audit. The implemented mitigations are below.
 
 ## Implemented mitigations
 
-| Threat (p2 §14) | Mitigation in this repo |
+| Threat | Mitigation in this repo |
 | --------------- | ----------------------- |
 | Fake x402 revenue / collusion rings | `FraudService` — reciprocal-loop, operator-linkage, revenue-concentration and velocity detection; gates credit underwriting (`lib/services/fraud_service.ts`). |
 | Payment replay | Nonce uniqueness per payer + payment-proof dedupe + expiry rejection in `X402ReceiptRegistry` and the Odra contract; `verifyPayment` rejects expired challenges. |
@@ -17,8 +17,7 @@ KYC/lending without an audit. See `docs/p2.md` §14 for the full threat model.
 ## Reporting
 
 This is a demo repository. For the production protocol, security reports would go
-to a dedicated channel with coordinated disclosure (see `docs/p2.md` →
-`security/incident-response.md`).
+to a dedicated channel with coordinated disclosure.
 
 ## Secrets
 

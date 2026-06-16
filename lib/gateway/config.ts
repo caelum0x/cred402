@@ -83,7 +83,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       maxRequests: readInt("CRED402_RATE_MAX", 120, 1),
     },
     casper: {
-      nodeAddress: env.CRED402_CASPER_NODE ?? "https://rpc.testnet.casperlabs.io",
+      nodeAddress: env.CRED402_CASPER_NODE ?? "https://node.testnet.casper.network",
       chainName: env.CRED402_CASPER_CHAIN ?? "casper-test",
     },
     webhooks: {

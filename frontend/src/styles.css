@@ -24,12 +24,21 @@ h1, h2, h3 { margin: 0; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .brand { display: flex; gap: 14px; align-items: center; }
 .logo { font-size: 34px; color: var(--accent); filter: drop-shadow(0 0 12px rgba(91,140,255,.6)); }
+.logo-mark { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; filter: drop-shadow(0 0 10px rgba(91,140,255,.45)); }
 .brand h1 { font-size: 26px; letter-spacing: -0.5px; }
 .tagline { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .status { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
 .status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
 .status.online .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 .status .policy { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--accent-2); }
+
+/* Casper Wallet connect button (real extension integration) */
+.wallet-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; transition: .15s; }
+.wallet-btn:hover { border-color: var(--accent); }
+.wallet-btn:disabled { opacity: .6; cursor: default; }
+.wallet-btn.wallet-connected { color: var(--accent-2); border-color: var(--accent-2); }
+.wallet-btn.wallet-connected .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2); }
+.wallet-btn.wallet-install { color: var(--muted); }
 
 .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
 .btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-size: 14px; transition: .15s; }
@@ -118,3 +127,47 @@ h1, h2, h3 { margin: 0; }
 
 .clickable { cursor: pointer; }
 .clickable:hover td { background: rgba(255,255,255,0.04); }
+
+/* Explorer search input + notification bell (product pages) */
+.input { background: var(--panel-2, #161a24); color: var(--text, #e8ecf4); border: 1px solid var(--border, #2a3140); border-radius: 10px; padding: 10px 14px; font-size: 14px; outline: none; }
+.input:focus { border-color: #7c8aff; }
+.bell-badge { background: #ff5b5b; color: #fff; border-radius: 999px; font-size: 10px; padding: 1px 6px; margin-left: 4px; }
+.bell-panel { position: absolute; right: 0; top: 110%; width: 320px; max-height: 420px; overflow-y: auto; background: var(--panel, #11151d); border: 1px solid var(--border, #2a3140); border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,.5); z-index: 50; }
+.bell-item { display: flex; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border, #2a3140); font-size: 13px; }
+.bell-item:last-child { border-bottom: none; }
+.bell-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: 0 0 auto; }
+
+/* Developer portal GraphQL output */
+.json-out { background: #0c0f16; border: 1px solid var(--border, #2a3140); border-radius: 10px; padding: 12px; overflow-x: auto; font-size: 12px; max-height: 360px; color: #cfe3ff; }
+textarea.input { resize: vertical; }
+
+/* Agent detail overlay */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px; z-index: 100; overflow-y: auto; }
+.overlay-panel { background: var(--bg, #0b0e14); border: 1px solid var(--border, #2a3140); border-radius: 16px; width: min(760px, 100%); padding: 18px; }
+.overlay-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.overlay-head h2 { margin: 0; }
+.overlay-body { display: flex; flex-direction: column; gap: 10px; }
+.kv { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; font-size: 14px; }
+.rowline { font-size: 13px; padding: 3px 0; display: flex; gap: 8px; align-items: center; }
+
+/* Sparklines */
+.spark-row { display: flex; flex-wrap: wrap; gap: 24px; }
+.sparkline { display: flex; flex-direction: column; gap: 4px; }
+.spark-label { font-size: 12px; color: var(--muted, #8a93a6); }
+.spark-label strong { color: var(--text, #e8ecf4); }
+
+/* Credit report */
+.credit-report { display: flex; flex-direction: column; gap: 14px; }
+.cr-score { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.cr-gauge { width: 110px; height: 110px; border: 5px solid #888; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.cr-num { font-size: 34px; font-weight: 700; }
+.cr-band { font-size: 12px; text-transform: capitalize; }
+.cr-terms { flex: 1; min-width: 240px; }
+.cr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.cr-cols h4 { margin: 4px 0 8px; }
+@media (max-width: 640px) { .cr-cols { grid-template-columns: 1fr; } }
+
+.csv-link { font-size: 12px; font-weight: 400; color: #7c8aff; margin-left: 10px; text-decoration: none; }
+.csv-link:hover { text-decoration: underline; }
+.link-btn { font-size: 12px; font-weight: 400; color: #7c8aff; margin-left: 10px; background: none; border: none; cursor: pointer; padding: 0; }
+.link-btn:hover { text-decoration: underline; }
