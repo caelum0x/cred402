@@ -367,6 +367,78 @@ func (c *Client) Portfolio(ctx context.Context) (map[string]any, error) {
 	return out, nil
 }
 
+// CreditCheck returns the credit-as-a-service oracle answer for an agent (GET /v1/credit/check/:id, p3).
+func (c *Client) CreditCheck(ctx context.Context, agentID string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/credit/check/"+pathEscape(agentID), nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreditChecks ranks a set of agents by creditworthiness (POST /v1/credit/check, p3).
+func (c *Client) CreditChecks(ctx context.Context, agentIDs []string) ([]map[string]any, error) {
+	var out []map[string]any
+	if err := c.do(ctx, http.MethodPost, "/v1/credit/check", map[string]any{"agent_ids": agentIDs}, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RiskScore returns the ML risk-engine v2 score for an agent (GET /v1/agents/:id/risk-score, p7).
+func (c *Client) RiskScore(ctx context.Context, agentID string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/agents/"+pathEscape(agentID)+"/risk-score", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DataCommons returns the anonymized public credit-data snapshot (GET /v1/credit/data-commons, p6).
+func (c *Client) DataCommons(ctx context.Context) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/credit/data-commons", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Exposure returns omnichain exposure reconciliation across all agents (GET /v1/credit/exposure, p5).
+func (c *Client) Exposure(ctx context.Context) ([]map[string]any, error) {
+	var out []map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/credit/exposure", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AgentExposure returns an agent's Casper-rooted exposure + global headroom (GET /v1/agents/:id/exposure, p5).
+func (c *Client) AgentExposure(ctx context.Context, agentID string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/agents/"+pathEscape(agentID)+"/exposure", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Verticals returns the service-vertical underwriting profiles (GET /v1/verticals, p10).
+func (c *Client) Verticals(ctx context.Context) ([]map[string]any, error) {
+	var out []map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/verticals", nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Vertical returns one service-vertical underwriting profile (GET /v1/verticals/:name, p10).
+func (c *Client) Vertical(ctx context.Context, name string) (map[string]any, error) {
+	var out map[string]any
+	if err := c.do(ctx, http.MethodGet, "/v1/verticals/"+pathEscape(name), nil, "", &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AttestationGraph returns the web-of-trust graph (GET /v1/attestations/graph).
 func (c *Client) AttestationGraph(ctx context.Context) (map[string]any, error) {
 	var out map[string]any

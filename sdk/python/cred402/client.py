@@ -378,6 +378,38 @@ class _Credit(_Resource):
         """GET /v1/credit/portfolio — LP portfolio & concentration (HHI) report."""
         return self._c.request("GET", "/v1/credit/portfolio")
 
+    def check(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/credit/check/:id — credit-as-a-service oracle check (p3)."""
+        return self._c.request("GET", f"/v1/credit/check/{urllib.parse.quote(agent_id)}")
+
+    def checks(self, agent_ids: List[str]) -> Any:
+        """POST /v1/credit/check — batch creditworthiness ranking (p3)."""
+        return self._c.request("POST", "/v1/credit/check", body={"agent_ids": agent_ids})
+
+    def risk_score(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/risk-score — ML risk-engine v2 score (p7)."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/risk-score")
+
+    def data_commons(self) -> Dict[str, Any]:
+        """GET /v1/credit/data-commons — anonymized public credit-data snapshot (p6)."""
+        return self._c.request("GET", "/v1/credit/data-commons")
+
+    def exposure(self) -> Any:
+        """GET /v1/credit/exposure — omnichain exposure reconciliation, all agents (p5)."""
+        return self._c.request("GET", "/v1/credit/exposure")
+
+    def agent_exposure(self, agent_id: str) -> Dict[str, Any]:
+        """GET /v1/agents/:id/exposure — Casper-rooted exposure + global headroom (p5)."""
+        return self._c.request("GET", f"/v1/agents/{urllib.parse.quote(agent_id)}/exposure")
+
+    def verticals(self) -> Any:
+        """GET /v1/verticals — service-vertical underwriting profiles (p10)."""
+        return self._c.request("GET", "/v1/verticals")
+
+    def vertical(self, name: str) -> Dict[str, Any]:
+        """GET /v1/verticals/:name — one vertical underwriting profile (p10)."""
+        return self._c.request("GET", f"/v1/verticals/{urllib.parse.quote(name)}")
+
     def simulate(
         self,
         monthly_revenue_cspr: float,

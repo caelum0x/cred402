@@ -223,6 +223,38 @@ impl Client {
     pub fn portfolio(&self) -> Result<Value, Cred402Error> {
         self.get("/v1/credit/portfolio")
     }
+    /// Credit-as-a-service oracle check for an agent (p3).
+    pub fn credit_check(&self, agent_id: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!("/v1/credit/check/{}", urlencode(agent_id)))
+    }
+    /// Batch creditworthiness ranking for a set of agents (p3).
+    pub fn credit_checks(&self, agent_ids: &[&str]) -> Result<Value, Cred402Error> {
+        self.post("/v1/credit/check", json!({ "agent_ids": agent_ids }), None)
+    }
+    /// ML risk-engine v2 score for an agent: PD + rules + blended (p7).
+    pub fn risk_score(&self, agent_id: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!("/v1/agents/{}/risk-score", urlencode(agent_id)))
+    }
+    /// Anonymized, k-anonymous public credit-data snapshot (p6).
+    pub fn data_commons(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/credit/data-commons")
+    }
+    /// Omnichain exposure reconciliation across all agents (p5).
+    pub fn exposure(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/credit/exposure")
+    }
+    /// An agent's Casper-rooted exposure + global headroom (p5).
+    pub fn agent_exposure(&self, agent_id: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!("/v1/agents/{}/exposure", urlencode(agent_id)))
+    }
+    /// Service-vertical underwriting profiles (p10).
+    pub fn verticals(&self) -> Result<Value, Cred402Error> {
+        self.get("/v1/verticals")
+    }
+    /// One service-vertical underwriting profile by name (p10).
+    pub fn vertical(&self, name: &str) -> Result<Value, Cred402Error> {
+        self.get(&format!("/v1/verticals/{}", urlencode(name)))
+    }
     /// Side-by-side comparison of two agents.
     pub fn compare_agents(&self, a: &str, b: &str) -> Result<Value, Cred402Error> {
         self.get(&format!(
