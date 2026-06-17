@@ -29,10 +29,11 @@ real x402 + EIP-712, MCP, RealFi (Stripe/Plaid), and cross-chain standards. See
 | [p3](p3.md) ✅ | **Credit-as-a-service** | Other x402 protocols query Cred402 for agent creditworthiness ("Cred402 Inside") |
 | [p4](p4.md) ✅ | **Mainnet-beta credit market** | Real liquidity, risk caps, insurance, governance — controlled launch |
 | [p5](p5.md) ✅ | **Omnichain credit** | Agents earn/borrow on any chain under Casper-rooted credit *(shipped: `CrossChainReconciler` ties satellite draws/repayments back to the `GlobalExposureManager`, flags over-borrow + unauthorized draws, `globalHeadroom()` over-borrow guard)* |
-| [p6](p6.md) | **Decentralization & data moat** | DAO governance, dispute jurors, public credit-data goods |
-
-Later (p7+): ML risk-engine v2, zk receipt proofs (trust-ladder Stage 4),
-enterprise RealFi GA, and new service verticals (compute/inference/data markets).
+| [p6](p6.md) ✅ | **Decentralization & data moat** | DAO governance, dispute jurors, public credit-data goods *(shipped: `DisputeJury` deterministic staked panel with reward/penalty consensus, `CreditDataCommons` k-anonymous public benchmark; DAO param governance already live via `GovernanceProposals`)* |
+| [p7](p7.md) | **ML risk-engine v2** | Feature-based scoring model that learns from realized credit performance |
+| [p8](p8.md) | **zk receipt proofs** | Trust-ladder Stage 4: prove receipt validity without revealing the receipt |
+| [p9](p9.md) | **Enterprise RealFi GA** | Production RealFi controls: tenants, entitlements, audit export |
+| [p10](p10.md) | **New service verticals** | Compute / inference / data markets as first-class credit verticals |
 
 The north-star metric stays the same across all phases: **finalized x402 service
 revenue used in credit decisions** — proof that agents are earning, receipts are
