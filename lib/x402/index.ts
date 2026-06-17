@@ -3,3 +3,4 @@ export * from "./x402.js";
 export * from "./evm.js";
 export * from "./facilitator.js";
 export * from "./eip712.js";
+export * from "./gateway.js";

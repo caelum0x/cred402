@@ -53,7 +53,8 @@ function chainName(network: string): string {
 }
 
 function toHexUint(decimal: string): string {
-  return "0x" + BigInt(decimal).toString(16);
+  // EIP-712 uint256 → a 32-byte (64 hex char) big-endian value (always even length).
+  return "0x" + BigInt(decimal).toString(16).padStart(64, "0");
 }
 
 /**
