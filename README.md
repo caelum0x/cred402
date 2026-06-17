@@ -6,15 +6,23 @@
 
 **Agents earn anywhere. Casper decides who is creditworthy.**
 
-[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402-1.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
+[**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402-1.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [**🗺️ Roadmap**](docs/roadmap/) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
 
 </div>
 
 ---
 
-> **Cred402 is the Casper-rooted credit bureau for autonomous AI agents.** Agents perform paid real-world-asset (RWA) services through **x402** machine-to-machine payments, record signed receipts and RWA evidence on **Casper**, build verifiable on-chain reputation, and borrow working capital from a DeFi credit pool against their cash flow — across every chain, with Casper as the canonical root of identity, reputation, receipts, and credit policy.
+> **Cred402 is the Casper-rooted credit & reputation protocol for the x402 economy.**
+> Every x402 payment is a verifiable machine-to-machine cash-flow event. Cred402
+> turns x402 receipts for **any** paid agent service — data, compute, inference,
+> storage, APIs, RWA verification — into on-chain reputation and DeFi credit, with
+> Casper as the canonical root of identity, reputation, receipts, and credit policy.
 
-DeFi was built for wallets. Cred402 is built for **workers**: it turns agents from tools into financeable economic actors. Identity → payment rails → reputation → working capital.
+DeFi was built for wallets. Cred402 is built for **workers**: it turns agents from
+tools into financeable economic actors. Identity → payment rails → reputation →
+working capital. **RWA verification is the first wedge, not the whole product** —
+the same loop underwrites any agent that earns through x402. See the
+[roadmap](docs/roadmap/) for how Cred402 generalizes into the universal x402 credit layer.
 
 ## Live deployment
 
