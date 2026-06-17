@@ -33,7 +33,7 @@ real x402 + EIP-712, MCP, RealFi (Stripe/Plaid), and cross-chain standards. See
 | [p7](p7.md) ✅ | **ML risk-engine v2** | Feature-based scoring model that learns from realized credit performance *(shipped: `RiskEngineV2` logistic-regression PD model, gradient-descent training, blended ml+rules score)* |
 | [p8](p8.md) ✅ | **zk receipt proofs** | Trust-ladder Stage 4: prove receipt validity without revealing the receipt *(shipped: `ReceiptProofSystem` field commitments + Merkle anchoring + selective-disclosure proofs)* |
 | [p9](p9.md) ✅ | **Enterprise RealFi GA** | Production RealFi controls: tenants, entitlements, audit export *(shipped: `EnterpriseRealFi` plan-based entitlements, quota + rate limits, exportable audit trail)* |
-| [p10](p10.md) | **New service verticals** | Compute / inference / data markets as first-class credit verticals |
+| [p10](p10.md) ✅ | **New service verticals** | Compute / inference / data markets as first-class credit verticals *(shipped: `ServiceVerticals` per-vertical underwriting profiles — advance rate, volatility haircut, qualification gates)* |
 
 The north-star metric stays the same across all phases: **finalized x402 service
 revenue used in credit decisions** — proof that agents are earning, receipts are
