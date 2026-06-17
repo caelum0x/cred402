@@ -22,7 +22,12 @@ Usage:
   cred402 bureau market                       service-category market analytics
   cred402 bureau x402                         x402 receipt-network stats
   cred402 bureau disputes                     protocol dispute statistics
-  cred402 bureau config                       protocol rulebook (fees, gates, tiers)`;
+  cred402 bureau config                       protocol rulebook (fees, gates, tiers)
+  cred402 bureau credit-check <agent_id>      credit-as-a-service oracle check (p3)
+  cred402 bureau risk-score <agent_id>        ML risk-engine v2 score (p7)
+  cred402 bureau data-commons                 anonymized public credit-data snapshot (p6)
+  cred402 bureau exposure [agent_id]          omnichain credit exposure / reconciliation (p5)
+  cred402 bureau verticals                    service-vertical underwriting profiles (p10)`;
 
 export async function bureauCommand(ctx: CommandContext): Promise<void> {
   const sub = ctx.args[0];
@@ -53,6 +58,16 @@ export async function bureauCommand(ctx: CommandContext): Promise<void> {
       return disputes(ctx);
     case "config":
       return config(ctx);
+    case "credit-check":
+      return creditCheck(ctx);
+    case "risk-score":
+      return riskScore(ctx);
+    case "data-commons":
+      return dataCommons(ctx);
+    case "exposure":
+      return exposure(ctx);
+    case "verticals":
+      return verticals(ctx);
     case undefined:
     case "--help":
     case "-h":
@@ -326,6 +341,124 @@ async function config(ctx: CommandContext): Promise<void> {
     table(
       [{ header: "TIER" }, { header: "MIN REP", align: "right" }, { header: "MULTIPLIER", align: "right" }, { header: "ORIG DISCOUNT", align: "right" }],
       c.reputation_tiers.map((t) => [t.tier, String(t.min_reputation), `x${t.credit_multiplier}`, `${t.origination_discount_bps}bps`]),
+    ),
+  );
+}
+
+async function creditCheck(ctx: CommandContext): Promise<void> {
+  const id = requireArg(ctx.args, 1, "agent_id");
+  const c = await ctx.client.get<{
+    exists: boolean; service_type?: string; eligible: boolean; ineligible_reason?: string;
+    credit_score: number; recommended_limit_motes: string; interest_rate_bps: number; risk_flags: string[]; policy_version: string;
+  }>(`/v1/credit/check/${encodeURIComponent(id)}`);
+  emit(ctx, c, () =>
+    heading(`Credit check — ${id}`) +
+    "\n" +
+    keyValues([
+      ["exists", String(c.exists)],
+      ["service_type", c.service_type ?? "—"],
+      ["eligible", c.eligible ? color.green("yes") : color.red(`no (${c.ineligible_reason ?? "n/a"})`)],
+      ["credit_score", String(c.credit_score)],
+      ["recommended_limit", formatCspr(c.recommended_limit_motes)],
+      ["interest_rate", `${(c.interest_rate_bps / 100).toFixed(2)}%`],
+      ["risk_flags", c.risk_flags.length ? c.risk_flags.join(", ") : "none"],
+      ["policy", c.policy_version],
+    ]),
+  );
+}
+
+async function riskScore(ctx: CommandContext): Promise<void> {
+  const id = requireArg(ctx.args, 1, "agent_id");
+  const r = await ctx.client.get<{ pd: number; ml_score: number; rules_score: number; blended_score: number; risk_band: string }>(
+    `/v1/agents/${encodeURIComponent(id)}/risk-score`,
+  );
+  emit(ctx, r, () =>
+    heading(`Risk score v2 — ${id}`) +
+    "\n" +
+    keyValues([
+      ["probability_of_default", `${(r.pd * 100).toFixed(2)}%`],
+      ["ml_score", String(r.ml_score)],
+      ["rules_score", String(r.rules_score)],
+      ["blended_score", String(r.blended_score)],
+      ["risk_band", r.risk_band],
+    ]),
+  );
+}
+
+async function dataCommons(ctx: CommandContext): Promise<void> {
+  const d = await ctx.client.get<{
+    k_anonymity: number; agents: { total: number; active: number };
+    pool: { utilization_bps: number }; disputes: { total: number; resolved: number; slash_rate_bps: number };
+    by_category: Array<{ family: string; agent_count: number; avg_reputation: number; outstanding_share_bps: number }>;
+  }>("/v1/credit/data-commons");
+  emit(ctx, d, () =>
+    heading(`Credit-data commons (k=${d.k_anonymity})`) +
+    "\n" +
+    keyValues([
+      ["agents", `${d.agents.total} (${d.agents.active} active)`],
+      ["utilization", `${(d.pool.utilization_bps / 100).toFixed(1)}%`],
+      ["disputes", `${d.disputes.total} (${d.disputes.resolved} resolved, ${(d.disputes.slash_rate_bps / 100).toFixed(0)}% slashed)`],
+    ]) +
+    heading("By category") +
+    "\n" +
+    table(
+      [{ header: "FAMILY" }, { header: "AGENTS", align: "right" }, { header: "AVG REP", align: "right" }, { header: "OUTSTANDING SHARE", align: "right" }],
+      d.by_category.map((c) => [c.family, String(c.agent_count), String(c.avg_reputation), `${(c.outstanding_share_bps / 100).toFixed(1)}%`]),
+    ),
+  );
+}
+
+async function exposure(ctx: CommandContext): Promise<void> {
+  const id = ctx.args[1];
+  if (id) {
+    const e = await ctx.client.get<{
+      has_exposure: boolean; consistent: boolean; casper_outstanding: string; casper_reserved: string;
+      satellite_outstanding: string; max_allowed: string; global_headroom_motes: string; over_cap: boolean; frozen: boolean; alerts: string[];
+    }>(`/v1/agents/${encodeURIComponent(id)}/exposure`);
+    emit(ctx, e, () =>
+      heading(`Exposure — ${id}`) +
+      "\n" +
+      keyValues([
+        ["has_exposure", String(e.has_exposure)],
+        ["consistent", e.consistent ? color.green("yes") : color.red("no")],
+        ["casper_outstanding", e.casper_outstanding],
+        ["casper_reserved", e.casper_reserved],
+        ["satellite_outstanding", e.satellite_outstanding],
+        ["max_allowed", e.max_allowed],
+        ["global_headroom", e.global_headroom_motes],
+        ["over_cap", String(e.over_cap)],
+        ["frozen", String(e.frozen)],
+        ["alerts", e.alerts.length ? e.alerts.join("; ") : "none"],
+      ]),
+    );
+    return;
+  }
+  const all = await ctx.client.get<Array<{ agent_id: string; consistent: boolean; casper_outstanding: string; global_headroom: string; alerts: string[] }>>(
+    "/v1/credit/exposure",
+  );
+  emit(ctx, all, () =>
+    heading(`Omnichain exposure — ${all.length} agent(s)`) +
+    "\n" +
+    (all.length === 0
+      ? color.dim("no agents with global exposure records yet")
+      : table(
+          [{ header: "AGENT" }, { header: "CONSISTENT" }, { header: "OUTSTANDING", align: "right" }, { header: "HEADROOM", align: "right" }, { header: "ALERTS" }],
+          all.map((e) => [e.agent_id, e.consistent ? "yes" : "NO", e.casper_outstanding, e.global_headroom, String(e.alerts.length)]),
+        )),
+  );
+}
+
+async function verticals(ctx: CommandContext): Promise<void> {
+  const list = await ctx.client.get<Array<{
+    vertical: string; display_name: string; advance_rate_bps: number; revenue_volatility_bps: number;
+    settlement_days: number; min_track_record_jobs: number; risk_band: string;
+  }>>("/v1/verticals");
+  emit(ctx, list, () =>
+    heading(`Service verticals — ${list.length} profile(s)`) +
+    "\n" +
+    table(
+      [{ header: "VERTICAL" }, { header: "ADVANCE", align: "right" }, { header: "VOLATILITY", align: "right" }, { header: "SETTLE", align: "right" }, { header: "MIN JOBS", align: "right" }, { header: "BAND" }],
+      list.map((v) => [v.vertical, `${(v.advance_rate_bps / 100).toFixed(0)}%`, `${(v.revenue_volatility_bps / 100).toFixed(0)}%`, `${v.settlement_days}d`, String(v.min_track_record_jobs), v.risk_band]),
     ),
   );
 }

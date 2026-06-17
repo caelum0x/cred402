@@ -47,6 +47,15 @@ export interface GraphQLDataSource {
   riskAlerts(): unknown;
   yieldProjection(): unknown;
   fleetOverview(agentIds: string[]): unknown;
+  // p3/p5/p6/p7/p10 services
+  creditCheck(agentId: string): unknown;
+  creditChecks(agentIds: string[]): unknown;
+  riskScoreV2(agentId: string): unknown;
+  dataCommons(): unknown;
+  exposureReconciliation(): unknown;
+  agentExposure(agentId: string): unknown;
+  verticalProfiles(): unknown;
+  verticalProfile(name: string): unknown;
   simulateCredit(input: { monthly_revenue_cspr: number; reputation?: number; stake_cspr?: number }): unknown;
   listCreditOffers(agentId?: string): unknown;
   // mutations
@@ -139,6 +148,14 @@ export function makeRoot(src: GraphQLDataSource) {
     simulateCredit: ({ monthly_revenue_cspr, reputation, stake_cspr }: { monthly_revenue_cspr: number; reputation?: number; stake_cspr?: number }) =>
       src.simulateCredit({ monthly_revenue_cspr, reputation, stake_cspr }),
     creditOffers: ({ agentId }: { agentId?: string }) => src.listCreditOffers(agentId),
+    creditCheck: ({ agentId }: { agentId: string }) => src.creditCheck(agentId),
+    creditChecks: ({ agentIds }: { agentIds: string[] }) => src.creditChecks(agentIds),
+    riskScore: ({ agentId }: { agentId: string }) => src.riskScoreV2(agentId),
+    dataCommons: () => src.dataCommons(),
+    exposure: () => src.exposureReconciliation(),
+    agentExposure: ({ agentId }: { agentId: string }) => src.agentExposure(agentId),
+    verticals: () => src.verticalProfiles(),
+    vertical: ({ name }: { name: string }) => src.verticalProfile(name),
     // mutations (same rootValue object; graphql resolves Mutation fields here too)
     registerAgent: ({ agent_id, service_type }: { agent_id: string; service_type: string }) => src.mRegisterAgent(agent_id, service_type),
     openCreditLine: ({ agent_id }: { agent_id: string }) => src.mOpenCreditLine(agent_id),

@@ -190,6 +190,40 @@ export class Cred402Client {
     return this.request("POST", `/v1/credit/offers/${encodeURIComponent(offer_id)}/decline`);
   }
 
+  // -- credit-as-a-service & cross-cutting services (p3/p5/p6/p7/p10) -----
+  /** Credit-as-a-service oracle check ("Cred402 Inside", p3). */
+  creditCheck(agent_id: string): Promise<unknown> {
+    return this.request("GET", `/v1/credit/check/${encodeURIComponent(agent_id)}`);
+  }
+  /** Batch oracle check — rank a set of agents by creditworthiness (p3). */
+  creditChecks(agent_ids: string[]): Promise<unknown> {
+    return this.request("POST", "/v1/credit/check", { agent_ids });
+  }
+  /** ML risk-engine v2 score: learned PD + rules + blended (p7). */
+  riskScore(agent_id: string): Promise<unknown> {
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/risk-score`);
+  }
+  /** Anonymized, k-anonymous public credit-data commons snapshot (p6). */
+  dataCommons(): Promise<unknown> {
+    return this.request("GET", "/v1/credit/data-commons");
+  }
+  /** Global omnichain exposure reconciliation across all agents (p5). */
+  exposure(): Promise<unknown> {
+    return this.request("GET", "/v1/credit/exposure");
+  }
+  /** One agent's Casper-rooted exposure + global headroom (p5). */
+  agentExposure(agent_id: string): Promise<unknown> {
+    return this.request("GET", `/v1/agents/${encodeURIComponent(agent_id)}/exposure`);
+  }
+  /** Service-vertical underwriting profiles (p10). */
+  verticals(): Promise<unknown> {
+    return this.request("GET", "/v1/verticals");
+  }
+  /** One service-vertical underwriting profile by name (p10). */
+  vertical(name: string): Promise<unknown> {
+    return this.request("GET", `/v1/verticals/${encodeURIComponent(name)}`);
+  }
+
   // -- markets / analytics ------------------------------------------------
   marketplace(): Promise<MarketListing[]> {
     return this.request("GET", "/v1/marketplace");

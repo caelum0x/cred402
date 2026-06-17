@@ -286,6 +286,10 @@ export class ServerState {
   verticalProfiles() {
     return this.verticals.list();
   }
+  /** One service-vertical underwriting profile by name (p10). */
+  verticalProfile(name: string) {
+    return this.verticals.get(name) ?? { error: `unknown vertical: ${name}` };
+  }
   /** Onboarding readiness scorecard — what an agent needs to qualify for credit. */
   onboardingScorecard(agentId: string) {
     return buildOnboardingScorecard(this.ledger, agentId);

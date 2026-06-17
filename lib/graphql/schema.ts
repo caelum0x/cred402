@@ -99,6 +99,14 @@ export const schema = buildSchema(/* GraphQL */ `
     fleetOverview(agentIds: [ID!]!): JSON!
     simulateCredit(monthly_revenue_cspr: Float!, reputation: Float, stake_cspr: Float): JSON!
     creditOffers(agentId: ID): JSON!
+    creditCheck(agentId: ID!): JSON
+    creditChecks(agentIds: [ID!]!): JSON!
+    riskScore(agentId: ID!): JSON
+    dataCommons: JSON!
+    exposure: JSON!
+    agentExposure(agentId: ID!): JSON
+    verticals: JSON!
+    vertical(name: ID!): JSON
   }
 
   type Mutation {
