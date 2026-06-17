@@ -31,7 +31,7 @@ real x402 + EIP-712, MCP, RealFi (Stripe/Plaid), and cross-chain standards. See
 | [p5](p5.md) ✅ | **Omnichain credit** | Agents earn/borrow on any chain under Casper-rooted credit *(shipped: `CrossChainReconciler` ties satellite draws/repayments back to the `GlobalExposureManager`, flags over-borrow + unauthorized draws, `globalHeadroom()` over-borrow guard)* |
 | [p6](p6.md) ✅ | **Decentralization & data moat** | DAO governance, dispute jurors, public credit-data goods *(shipped: `DisputeJury` deterministic staked panel with reward/penalty consensus, `CreditDataCommons` k-anonymous public benchmark; DAO param governance already live via `GovernanceProposals`)* |
 | [p7](p7.md) ✅ | **ML risk-engine v2** | Feature-based scoring model that learns from realized credit performance *(shipped: `RiskEngineV2` logistic-regression PD model, gradient-descent training, blended ml+rules score)* |
-| [p8](p8.md) | **zk receipt proofs** | Trust-ladder Stage 4: prove receipt validity without revealing the receipt |
+| [p8](p8.md) ✅ | **zk receipt proofs** | Trust-ladder Stage 4: prove receipt validity without revealing the receipt *(shipped: `ReceiptProofSystem` field commitments + Merkle anchoring + selective-disclosure proofs)* |
 | [p9](p9.md) | **Enterprise RealFi GA** | Production RealFi controls: tenants, entitlements, audit export |
 | [p10](p10.md) | **New service verticals** | Compute / inference / data markets as first-class credit verticals |
 
