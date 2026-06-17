@@ -7,13 +7,14 @@
  * Testnet, while the architecture stays identical.
  */
 
-export type ServiceType =
-  | "solar_output_verification"
-  | "weather_risk"
-  | "receivable_quality"
-  | "risk_scoring"
-  | "treasury_routing"
-  | "monitoring";
+/**
+ * A service type is any registered x402 service category (roadmap p1) —
+ * `<family>.<name>`, e.g. "rwa.weather_risk", "inference.llm", "data.market".
+ * Cred402 underwrites ANY x402 cash flow, so this is an open string keyed to the
+ * ServiceCategoryRegistry (`lib/core/service_categories.ts`), not a closed
+ * RWA-only union. Legacy demo values like "solar_output_verification" remain valid.
+ */
+export type ServiceType = string;
 
 // ---------------------------------------------------------------------------
 // AgentRegistry
@@ -154,6 +155,8 @@ export type EventName =
   | "RwaJobCreated"
   | "RwaJobScored"
   | "RwaAssetRegistered"
+  | "ServiceCategoryRegistered"
+  | "ServiceCategoryRiskUpdated"
   | "CreditScoreSet"
   | "CreditLineOpened"
   | "CreditDrawn"

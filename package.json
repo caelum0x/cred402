@@ -38,7 +38,8 @@
     "test": "tsx --test test/*.test.ts",
     "simulate": "tsx scripts/simulate.ts",
     "demo:bureau": "tsx scripts/demo_bureau.ts",
-    "record:demo": "node scripts/record_demo.mjs"
+    "record:demo": "node scripts/record_demo.mjs",
+    "demo:x402": "tsx scripts/universal_credit_demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

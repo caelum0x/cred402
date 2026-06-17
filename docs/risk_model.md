@@ -29,6 +29,29 @@ credit_line    : 38.1 * 1.50 * 0.915 * 0.90 ≈ 47 CSPR
 Credit score (0..100) blends accuracy, reputation and (100 − dispute%). Interest is
 inversely mapped from score: ~8% APR for a top agent, ~22% APR for a weak one.
 
+## Service-category weighting (roadmap p1) — credit for the whole x402 economy
+
+Cred402 underwrites **any** x402 service, not just RWA. Every credit line is scaled
+by a `category_multiplier` from the agent's service category:
+
+```
+credit_line *= category_multiplier        # categoryRiskMultiplier(service_type)
+```
+
+The weight comes from the `ServiceCategoryRegistry`
+(`lib/core/service_categories.ts` + the on-chain mirror), governance-tunable per
+category family:
+
+```
+rwa 1.00 · compliance 0.95 · data/api 0.90 · compute/storage 0.85 ·
+inference/dispute 0.80 · defi 0.75 · unknown 0.65 (conservative default)
+```
+
+So a non-RWA agent (e.g. `inference.llm`) builds a credit line from its x402
+receipts alone — no RWA evidence required — just weighted for its category's risk.
+Run `npm run demo:x402` to see it. RWA evidence remains an optional *boost* for RWA
+categories, not a gate.
+
 ## The upgrade (v2)
 
 `v2` demonstrates a hot-swappable policy that:

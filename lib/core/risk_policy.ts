@@ -1,6 +1,7 @@
 import type { Agent, RevenueEvent } from "./types.js";
 import type { ReasonCodeEntry } from "./reason_codes.js";
 import { scaleMotes } from "./units.js";
+import { categoryRiskMultiplier } from "./service_categories.js";
 
 /**
  * RiskPolicyManager — the upgradable underwriting brain.
@@ -56,7 +57,10 @@ export const policyV1: PolicyFn = (agent, now) => {
   // accuracy_multiplier = accuracy_score / 100
   const accuracy_multiplier = agent.accuracy_score / 100;
 
-  const ratio = stake_multiplier * dispute_penalty * accuracy_multiplier;
+  // category_multiplier (p1): scale by the service category's credit-risk weight,
+  // so credit works for ANY x402 service, weighted by its category — not just RWA.
+  const category_multiplier = categoryRiskMultiplier(agent.service_type);
+  const ratio = stake_multiplier * dispute_penalty * accuracy_multiplier * category_multiplier;
   const credit_line = scaleMotes(base_limit, ratio);
 
   const credit_score = clampScore(
@@ -64,6 +68,9 @@ export const policyV1: PolicyFn = (agent, now) => {
       0.3 * agent.reputation_score +
       0.2 * (100 - agent.dispute_rate * 100),
   );
+
+  const rationale = buildRationale(agent, stake_multiplier, dispute_penalty, accuracy_multiplier);
+  rationale.push(`category ${agent.service_type} risk weight x${category_multiplier.toFixed(2)}`);
 
   return {
     policy_version: "v1",
@@ -75,7 +82,7 @@ export const policyV1: PolicyFn = (agent, now) => {
     credit_line,
     interest_rate_bps: interestFromScore(credit_score),
     credit_score,
-    rationale: buildRationale(agent, stake_multiplier, dispute_penalty, accuracy_multiplier),
+    rationale,
   };
 };
 
@@ -99,7 +106,8 @@ export const policyV2: PolicyFn = (agent, now) => {
   // Throughput bonus: more completed jobs => slightly higher line, capped.
   const throughput_bonus = Math.min(1.25, 1 + agent.total_jobs_completed / 1000);
 
-  const ratio = stake_multiplier * dispute_penalty * accuracy_multiplier * throughput_bonus;
+  const category_multiplier = categoryRiskMultiplier(agent.service_type);
+  const ratio = stake_multiplier * dispute_penalty * accuracy_multiplier * throughput_bonus * category_multiplier;
   const credit_line = scaleMotes(base_limit, ratio);
 
   const credit_score = clampScore(
@@ -111,6 +119,7 @@ export const policyV2: PolicyFn = (agent, now) => {
 
   const rationale = buildRationale(agent, stake_multiplier, dispute_penalty, accuracy_multiplier);
   rationale.push(`throughput bonus x${throughput_bonus.toFixed(2)} (${agent.total_jobs_completed} jobs)`);
+  rationale.push(`category ${agent.service_type} risk weight x${category_multiplier.toFixed(2)}`);
 
   return {
     policy_version: "v2",

@@ -24,7 +24,7 @@ real x402 + EIP-712, MCP, RealFi (Stripe/Plaid), and cross-chain standards. See
 
 | Phase | Theme | One-line goal |
 | ----- | ----- | ------------- |
-| [p1](p1.md) | **Universal x402 receipts** | Make *any* x402 service — not just RWA — a first-class credit input |
+| [p1](p1.md) ✅ | **Universal x402 receipts** | Make *any* x402 service — not just RWA — a first-class credit input *(shipped: `ServiceCategoryRegistry` + category-weighted credit, `npm run demo:x402`)* |
 | [p2](p2.md) | **x402 Gateway wedge** | One-line middleware so any API becomes x402-payable + receipt-generating |
 | [p3](p3.md) | **Credit-as-a-service** | Other x402 protocols query Cred402 for agent creditworthiness ("Cred402 Inside") |
 | [p4](p4.md) | **Mainnet-beta credit market** | Real liquidity, risk caps, insurance, governance — controlled launch |

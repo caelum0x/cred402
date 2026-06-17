@@ -5,6 +5,7 @@ import { X402ReceiptRegistry } from "./contracts/x402_receipt_registry.js";
 import { RWAEvidenceRegistry } from "./contracts/rwa_evidence_registry.js";
 import { AgentCreditPool } from "./contracts/agent_credit_pool.js";
 import { RiskPolicyManager } from "./contracts/risk_policy_manager.js";
+import { ServiceCategoryRegistry } from "./contracts/service_category_registry.js";
 import { RWAJobBoard } from "./contracts/rwa_jobs.js";
 import { DisputeCourt } from "./contracts/dispute_court.js";
 import { SlashingVault } from "./contracts/slashing_vault.js";
@@ -44,6 +45,7 @@ export class Ledger {
   readonly evidence: RWAEvidenceRegistry;
   readonly pool: AgentCreditPool;
   readonly policy: RiskPolicyManager;
+  readonly serviceCategories: ServiceCategoryRegistry;
   readonly jobs: RWAJobBoard;
 
   /**
@@ -58,6 +60,7 @@ export class Ledger {
     this.evidence = new RWAEvidenceRegistry(this.bus, this.clock);
     this.pool = new AgentCreditPool(this.bus, this.clock);
     this.policy = new RiskPolicyManager(this.bus, this.clock);
+    this.serviceCategories = new ServiceCategoryRegistry(this.bus, this.clock);
     this.jobs = new RWAJobBoard(this.bus, this.clock);
     this.disputes = new DisputeCourt(this.bus, this.clock);
     this.slashing = new SlashingVault(this.bus, this.clock);
