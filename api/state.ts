@@ -51,6 +51,11 @@ import { computeSafeDraw } from "../lib/services/safe_draw.js";
 import { buildLpDepositPreview } from "../lib/services/lp_deposit_preview.js";
 import { buildMarketplaceStats } from "../lib/services/marketplace_stats.js";
 import { buildReputationBreakdown } from "../lib/services/reputation_breakdown.js";
+import { Cred402CreditOracle } from "../lib/services/credit_oracle.js";
+import { CrossChainReconciler } from "../lib/services/crosschain_reconciliation.js";
+import { CreditDataCommons } from "../lib/services/credit_data_commons.js";
+import { RiskEngineV2 } from "../lib/services/risk_engine_v2.js";
+import { ServiceVerticals } from "../lib/services/service_verticals.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -65,6 +70,8 @@ export class ServerState {
   creditOffers: CreditOffers;
   /** Sign-in-with-Casper-Wallet challenge/session store (persists across resets). */
   readonly walletAuth = new WalletAuth();
+  /** Service-vertical underwriting profiles (p10) — governance-tunable, persisted. */
+  readonly verticals = new ServiceVerticals();
   readonly economics = new ProtocolEconomics();
   readonly pendingChallenges = new Map<string, PaymentChallenge>();
   // Persistent bus/clock so live SSE subscribers survive a ledger reset.
@@ -248,6 +255,36 @@ export class ServerState {
   /** LP forward yield projection (gross/LP interest, expected loss, net APY). */
   yieldProjection() {
     return buildYieldProjection(this.ledger, this.economics);
+  }
+  /** Credit-as-a-service oracle check ("Cred402 Inside", p3) — the read other
+   * x402 protocols query for an agent's creditworthiness. */
+  creditCheck(agentId: string) {
+    return new Cred402CreditOracle(this.ledger).creditCheck(agentId);
+  }
+  /** Batch oracle check — rank a set of agents by creditworthiness (p3). */
+  creditChecks(agentIds: string[]) {
+    return new Cred402CreditOracle(this.ledger).creditChecks(agentIds);
+  }
+  /** ML risk-engine v2 score (p7) — learned PD + rules score + blended score. */
+  riskScoreV2(agentId: string) {
+    return new RiskEngineV2(this.ledger).score(agentId);
+  }
+  /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
+  dataCommons() {
+    return new CreditDataCommons(this.ledger).snapshot();
+  }
+  /** Global cross-chain exposure reconciliation across all agents (p5). */
+  exposureReconciliation() {
+    return new CrossChainReconciler(this.ledger).reconcileAll();
+  }
+  /** One agent's Casper-rooted exposure + global headroom (p5). */
+  agentExposure(agentId: string) {
+    const recon = new CrossChainReconciler(this.ledger);
+    return { ...recon.reconcile(agentId), global_headroom_motes: recon.globalHeadroom(agentId).toString() };
+  }
+  /** Service-vertical underwriting profiles (p10). */
+  verticalProfiles() {
+    return this.verticals.list();
   }
   /** Onboarding readiness scorecard — what an agent needs to qualify for credit. */
   onboardingScorecard(agentId: string) {

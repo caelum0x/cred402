@@ -183,8 +183,8 @@ test("AgentPassport: aggregates profile + risk flags", () => {
   assert.equal(p.stake, cspr(50));
 });
 
-test("MCP tools: registry exposes 49 tools and they dispatch", () => {
-  assert.equal(TOOL_INDEX.size, 49);
+test("MCP tools: registry exposes 54 tools and they dispatch", () => {
+  assert.equal(TOOL_INDEX.size, 54);
   const econ = new Cred402Economy(new Ledger());
   econ.bootstrap();
   econ.createJob();
@@ -192,6 +192,11 @@ test("MCP tools: registry exposes 49 tools and they dispatch", () => {
   assert.equal(passport.agent_id, econ.seller.agent_id);
   const policy = TOOL_INDEX.get("cred402.get_risk_policy")!.handler({}, econ) as { policy_version: string };
   assert.equal(policy.policy_version, "v1");
+  // p3/p5/p6/p7/p10 service tools dispatch
+  const check = TOOL_INDEX.get("cred402.credit_check")!.handler({ agent_id: econ.seller.agent_id }, econ) as { exists: boolean };
+  assert.equal(check.exists, true);
+  const verticals = TOOL_INDEX.get("cred402.service_verticals")!.handler({}, econ) as unknown[];
+  assert.ok(Array.isArray(verticals) && verticals.length > 0);
   // the new bureau tools dispatch and return structured data
   const discovery = TOOL_INDEX.get("cred402.discover_agents")!.handler({ limit: 5 }, econ) as { results: unknown[] };
   assert.ok(Array.isArray(discovery.results));

@@ -34,6 +34,11 @@ import { buildLpDepositPreview } from "../lib/services/lp_deposit_preview.js";
 import { buildAgentHealthBadge } from "../lib/services/agent_health.js";
 import { computeCreditCost } from "../lib/services/credit_cost.js";
 import { ProtocolEconomics as ProtocolEconomicsForCost } from "../lib/core/economics.js";
+import { Cred402CreditOracle } from "../lib/services/credit_oracle.js";
+import { RiskEngineV2 } from "../lib/services/risk_engine_v2.js";
+import { CreditDataCommons } from "../lib/services/credit_data_commons.js";
+import { CrossChainReconciler } from "../lib/services/crosschain_reconciliation.js";
+import { ServiceVerticals } from "../lib/services/service_verticals.js";
 
 /**
  * Cred402 MCP tool registry (p2 §12).
@@ -534,6 +539,40 @@ export const TOOLS: ToolDef[] = [
         results,
       });
     },
+  },
+  {
+    name: "cred402.credit_check",
+    description: "Credit-as-a-service ('Cred402 Inside', p3): the creditworthiness answer other x402 protocols query — eligibility, recommended limit, score, interest rate, and risk flags, policy-version stamped.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(new Cred402CreditOracle(econ.ledger).creditCheck(String(a.agent_id))),
+  },
+  {
+    name: "cred402.risk_score_v2",
+    description: "ML risk-engine v2 (p7): learned probability-of-default plus the v1 rules score and a blended score, with the normalized feature vector behind it.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => jsonSafe(new RiskEngineV2(econ.ledger).score(String(a.agent_id))),
+  },
+  {
+    name: "cred402.credit_data_commons",
+    description: "Anonymized, k-anonymous public credit-data snapshot (p6 data moat): per-category and per-tier aggregates, pool utilization, and dispute slash rate. No agent ids.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(new CreditDataCommons(econ.ledger).snapshot()),
+  },
+  {
+    name: "cred402.agent_exposure",
+    description: "Omnichain credit reconciliation (p5): an agent's Casper-rooted global exposure, satellite consistency, and remaining global headroom across all chains.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => {
+      const recon = new CrossChainReconciler(econ.ledger);
+      const id = String(a.agent_id);
+      return jsonSafe({ ...recon.reconcile(id), global_headroom_motes: recon.globalHeadroom(id).toString() });
+    },
+  },
+  {
+    name: "cred402.service_verticals",
+    description: "Service-vertical underwriting profiles (p10): advance rate, volatility haircut, settlement horizon, and qualification gates per credit vertical (compute/inference/data/rwa/…).",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: () => jsonSafe(new ServiceVerticals().list()),
   },
 ];
 

@@ -159,6 +159,22 @@ export class V1Router {
       R("GET", "v1/credit/portfolio", "read", () => s.portfolioReport()) ??
       R("GET", "v1/risk/alerts", "read", () => s.riskAlerts()) ??
       R("GET", "v1/credit/yield-projection", "read", () => s.yieldProjection()) ??
+      // Credit-as-a-service oracle — "Cred402 Inside" (p3)
+      R("GET", "v1/credit/check/:id", "read", ({ params }) => s.creditCheck(params.id!)) ??
+      R("POST", "v1/credit/check", "read", ({ body }) => {
+        const b = parse(v.object({ agent_ids: v.array(v.string(), { max: 200 }) }), body);
+        return s.creditChecks(b.agent_ids);
+      }) ??
+      // ML risk-engine v2 score (p7)
+      R("GET", "v1/agents/:id/risk-score", "read", ({ params }) => s.riskScoreV2(params.id!)) ??
+      // Public credit-data commons (p6 data moat)
+      R("GET", "v1/credit/data-commons", "read", () => s.dataCommons()) ??
+      // Omnichain exposure reconciliation (p5)
+      R("GET", "v1/credit/exposure", "read", () => s.exposureReconciliation()) ??
+      R("GET", "v1/agents/:id/exposure", "read", ({ params }) => s.agentExposure(params.id!)) ??
+      // Service-vertical underwriting profiles (p10)
+      R("GET", "v1/verticals", "read", () => s.verticalProfiles()) ??
+      R("GET", "v1/verticals/:vertical", "read", ({ params }) => required(s.verticals.get(params.vertical!), "vertical")) ??
       R("GET", "v1/credit/lp-preview", "read", ({ url }) => {
         const deposit = numParam(url, "deposit_cspr");
         if (deposit === undefined) throw new ApiError(400, "bad_request", "deposit_cspr query parameter required");
