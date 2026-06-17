@@ -14,6 +14,7 @@ import { Explorer } from "./components/Explorer";
 import { Developer } from "./components/Developer";
 import { Ops } from "./components/Ops";
 import { Compliance } from "./components/Compliance";
+import { Bureau } from "./components/Bureau";
 import { Trust } from "./components/Trust";
 import { Discovery } from "./components/Discovery";
 import { Network } from "./components/Network";
@@ -25,7 +26,7 @@ import { WalletButton } from "./components/WalletButton";
 import { EventFeed } from "./components/EventFeed";
 import { Controls } from "./components/Controls";
 
-const TABS = ["Analytics", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Disputes", "Governance", "Multichain", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
+const TABS = ["Analytics", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
@@ -70,6 +71,7 @@ export function App() {
           {snapshot && tab === "x402" && <X402Playground />}
           {snapshot && tab === "Onboard" && <Onboard />}
           {snapshot && tab === "Risk" && <Risk />}
+          {snapshot && tab === "Bureau" && <Bureau />}
           {snapshot && tab === "Agents" && <Agents snapshot={snapshot} />}
           {snapshot && tab === "RWA Jobs" && <Jobs snapshot={snapshot} />}
           {snapshot && tab === "Receipts" && <Receipts snapshot={snapshot} />}

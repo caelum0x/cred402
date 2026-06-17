@@ -977,6 +977,74 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats> {
   return ((await res.json()) as { data: MarketplaceStats }).data;
 }
 
+// ---------------------------------------------------------------------------
+// Credit-bureau intelligence (roadmap p3/p5/p6/p7/p10)
+// ---------------------------------------------------------------------------
+
+export interface DataCommonsSnapshot {
+  generated_at: number;
+  k_anonymity: number;
+  agents: { total: number; active: number };
+  pool: { total_liquidity_motes: string; outstanding_credit_motes: string; utilization_bps: number };
+  disputes: { total: number; resolved: number; slash_rate_bps: number };
+  by_category: { family: string; agent_count: number; avg_reputation: number; total_outstanding_motes: string; outstanding_share_bps: number }[];
+  by_tier: { tier: string; agent_count: number; share_bps: number }[];
+}
+
+export interface RiskScoreV2 {
+  agent_id: string;
+  pd: number;
+  ml_score: number;
+  rules_score: number;
+  blended_score: number;
+  risk_band: "low" | "moderate" | "elevated" | "high";
+  features: Record<string, number>;
+}
+
+export interface VerticalProfile {
+  vertical: string;
+  display_name: string;
+  advance_rate_bps: number;
+  revenue_volatility_bps: number;
+  settlement_days: number;
+  min_track_record_jobs: number;
+  required_attestations: string[];
+  risk_band: string;
+}
+
+export interface CreditCheckResult {
+  agent_id: string;
+  exists: boolean;
+  service_type?: string;
+  credit_score: number;
+  reputation_score: number;
+  recommended_limit_motes: string;
+  interest_rate_bps: number;
+  eligible: boolean;
+  ineligible_reason?: string;
+  risk_flags: string[];
+  policy_version: string;
+}
+
+async function getV1<T>(path: string): Promise<T> {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
+  return ((await res.json()) as { data: T }).data;
+}
+
+export function getDataCommons(): Promise<DataCommonsSnapshot> {
+  return getV1<DataCommonsSnapshot>("/v1/credit/data-commons");
+}
+export function getVerticals(): Promise<VerticalProfile[]> {
+  return getV1<VerticalProfile[]>("/v1/verticals");
+}
+export function getRiskScore(agentId: string): Promise<RiskScoreV2> {
+  return getV1<RiskScoreV2>(`/v1/agents/${encodeURIComponent(agentId)}/risk-score`);
+}
+export function getCreditCheck(agentId: string): Promise<CreditCheckResult> {
+  return getV1<CreditCheckResult>(`/v1/credit/check/${encodeURIComponent(agentId)}`);
+}
+
 const MOTES = 1_000_000_000;
 export function fmtCspr(motes: string | number, decimals = 3): string {
   const n = Number(motes) / MOTES;

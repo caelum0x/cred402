@@ -41,6 +41,8 @@ h1, h2, h3 { margin: 0; }
 .wallet-btn.wallet-install { color: var(--muted); }
 
 .controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.form-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 9px 16px; border-radius: 10px; cursor: pointer; font-size: 14px; transition: .15s; }
 .btn:hover { border-color: var(--accent); }
 .btn:disabled { opacity: .5; cursor: progress; }
