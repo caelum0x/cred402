@@ -198,6 +198,33 @@ GET {{base}}/v1/risk/alerts
 ###
 GET {{base}}/v1/credit/yield-projection
 
+### Credit-as-a-service oracle check (p3)
+GET {{base}}/v1/credit/check/WeatherRiskAgent
+
+### Batch credit check (p3)
+POST {{base}}/v1/credit/check
+Content-Type: application/json
+
+{ "agent_ids": ["WeatherRiskAgent", "RWARequestAgent"] }
+
+### ML risk-engine v2 score (p7)
+GET {{base}}/v1/agents/WeatherRiskAgent/risk-score
+
+### Public credit-data commons (p6)
+GET {{base}}/v1/credit/data-commons
+
+### Omnichain exposure reconciliation (p5)
+GET {{base}}/v1/credit/exposure
+
+### Agent omnichain exposure + headroom (p5)
+GET {{base}}/v1/agents/WeatherRiskAgent/exposure
+
+### Service-vertical underwriting profiles (p10)
+GET {{base}}/v1/verticals
+
+### One service-vertical profile (p10)
+GET {{base}}/v1/verticals/compute
+
 ###
 GET {{base}}/v1/agents/WeatherRiskAgent/benchmark
 

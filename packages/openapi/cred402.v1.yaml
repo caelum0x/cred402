@@ -799,6 +799,160 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/credit/check/{id}:
+    get:
+      tags: [Credit]
+      operationId: getCreditCheck
+      summary: Credit-as-a-service oracle check (p3)
+      description: "The creditworthiness answer other x402 protocols query — eligibility, recommended limit, credit score, interest rate, and risk flags, policy-version stamped. 'Cred402 Inside.' **Requires `read` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Agent id. }
+      responses:
+        "200":
+          description: Credit check.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/check:
+    post:
+      tags: [Credit]
+      operationId: batchCreditCheck
+      summary: Batch credit check (p3)
+      description: "Rank a set of agents by creditworthiness in one call — e.g. a marketplace ranking its agents. **Requires `read` scope.**"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agent_ids]
+              properties:
+                agent_ids: { type: array, items: { type: string }, maxItems: 200 }
+      responses:
+        "200":
+          description: Batch credit checks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/risk-score:
+    get:
+      tags: [Agents, Credit]
+      operationId: getRiskScoreV2
+      summary: ML risk-engine v2 score (p7)
+      description: "Learned probability-of-default plus the v1 rules score and a blended score, with the normalized feature vector behind it. **Requires `read` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Agent id. }
+      responses:
+        "200":
+          description: Risk score.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/data-commons:
+    get:
+      tags: [Credit]
+      operationId: getCreditDataCommons
+      summary: Public credit-data commons (p6)
+      description: "Anonymized, k-anonymous protocol snapshot: per-category and per-tier aggregates, pool utilization, and dispute slash rate. No agent ids — safe to publish and cite. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Anonymized credit-data snapshot.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/credit/exposure:
+    get:
+      tags: [Credit]
+      operationId: getExposureReconciliation
+      summary: Omnichain exposure reconciliation (p5)
+      description: "Global cross-chain exposure reconciliation across all agents: Casper-rooted outstanding vs satellite reports, over-cap and consistency flags. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Reconciliation across all agents.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/agents/{id}/exposure:
+    get:
+      tags: [Agents, Credit]
+      operationId: getAgentExposure
+      summary: Agent omnichain exposure + headroom (p5)
+      description: "One agent's Casper-rooted global exposure, satellite consistency, and remaining global headroom across all chains. **Requires `read` scope.**"
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Agent id. }
+      responses:
+        "200":
+          description: Agent exposure + headroom.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/verticals:
+    get:
+      tags: [Credit]
+      operationId: getServiceVerticals
+      summary: Service-vertical underwriting profiles (p10)
+      description: "Per-vertical underwriting profiles (advance rate, volatility haircut, settlement horizon, qualification gates) for each credit vertical. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: Vertical profiles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/verticals/{vertical}:
+    get:
+      tags: [Credit]
+      operationId: getServiceVertical
+      summary: One service-vertical profile (p10)
+      description: "A single service-vertical underwriting profile by name (e.g. `compute`, `inference`, `rwa`). **Requires `read` scope.**"
+      parameters:
+        - { name: vertical, in: path, required: true, schema: { type: string }, description: Vertical family name. }
+      responses:
+        "200":
+          description: Vertical profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/operators/fleet-overview:
     post:
       tags: [Agents, Credit]
