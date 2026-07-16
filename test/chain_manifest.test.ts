@@ -26,7 +26,7 @@ test("chain manifest: every contract gets a resolvable cspr.live link", () => {
     assert.match(c.contract_hash, /^hash-[0-9a-f]{64}$/, `bad hash for ${c.name}`);
     // The explorer URL must use the raw hex, with the CLType `hash-` prefix stripped.
     const hex = c.contract_hash.replace(/^hash-/, "");
-    assert.equal(c.explorer_url, `${m.explorer}/contract/${hex}`);
+    assert.equal(c.explorer_url, `${m.explorer}/contract-package/${hex}`);
     assert.ok(!c.explorer_url.includes("hash-"), "explorer URL must not keep the hash- prefix");
   }
 });
@@ -40,7 +40,7 @@ test("chain manifest: deployer account links to its cspr.live page", () => {
 test("chain manifest: url builders normalise a trailing slash on the base", () => {
   assert.equal(
     contractExplorerUrl("https://x.io/", "hash-abcdef"),
-    "https://x.io/contract/abcdef",
+    "https://x.io/contract-package/abcdef",
   );
   assert.equal(
     accountExplorerUrl("https://x.io", "01ff"),
@@ -86,7 +86,7 @@ test("explorer: resolves a deployed contract by name with a cspr.live link", () 
   const results = new ExplorerService(new Ledger()).search("AgentRegistry");
   const contract = results.find((r) => r.kind === "contract");
   assert.ok(contract, "AgentRegistry should resolve as an on-chain contract");
-  assert.ok(contract.url?.startsWith("https://testnet.cspr.live/contract/"));
+  assert.ok(contract.url?.startsWith("https://testnet.cspr.live/contract-package/"));
   assert.ok(!contract.url?.includes("hash-"));
 });
 
@@ -97,5 +97,5 @@ test("explorer: resolves a deployed contract by its on-chain hash", () => {
   const results = new ExplorerService(new Ledger()).search(target.contract_hash);
   const hit = results.find((r) => r.kind === "contract" && r.id === target.contract_hash);
   assert.ok(hit, "a full contract hash should resolve to its contract");
-  assert.equal(hit.url, `${explorer}/contract/${target.contract_hash.replace(/^hash-/, "")}`);
+  assert.equal(hit.url, `${explorer}/contract-package/${target.contract_hash.replace(/^hash-/, "")}`);
 });

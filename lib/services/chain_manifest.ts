@@ -65,10 +65,16 @@ interface RawTransactions {
   deploys: Array<{ deploy_hash: string; contract: string; block_height: number; timestamp: string }>;
 }
 
-/** cspr.live keys contracts by their raw hex, without the `hash-` CLType prefix. */
+/**
+ * cspr.live browsable URL for a deployed Odra contract. The `contract_hash` in
+ * the deploy manifest is the contract *package* hash (that's the stable address
+ * Odra callers use), which cspr.live indexes under `/contract-package/<hex>` —
+ * NOT `/contract/<hex>` (that route expects a per-version contract hash and 404s
+ * for these). The hex is used without the `hash-` CLType prefix.
+ */
 export function contractExplorerUrl(explorerBase: string, contractHash: string): string {
   const hex = contractHash.replace(/^hash-/, "");
-  return `${explorerBase.replace(/\/$/, "")}/contract/${hex}`;
+  return `${explorerBase.replace(/\/$/, "")}/contract-package/${hex}`;
 }
 
 /** cspr.live account page for a Casper public key. */
