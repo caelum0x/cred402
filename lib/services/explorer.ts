@@ -1,21 +1,25 @@
 import type { Ledger } from "../ledger/ledger.js";
+import { loadChainManifest } from "./chain_manifest.js";
 
 /**
  * Protocol explorer — universal search across the canonical ledger.
  *
  * One query box that resolves agents, x402 receipts, RWA assets & evidence,
- * credit lines, disputes, and Casper transaction (deploy) hashes from the event
- * log. This is what powers the console Explorer page: paste any id/hash and jump
- * straight to the object.
+ * credit lines, disputes, on-chain contracts, and Casper transaction (deploy)
+ * hashes from the event log. This is what powers the console Explorer page: paste
+ * any id/hash and jump straight to the object — and out to cspr.live when the
+ * object (a deployed contract) lives on-chain.
  */
 
-export type ResultKind = "agent" | "receipt" | "evidence" | "asset" | "credit_line" | "dispute" | "transaction";
+export type ResultKind = "agent" | "receipt" | "evidence" | "asset" | "credit_line" | "dispute" | "contract" | "transaction";
 
 export interface SearchResult {
   kind: ResultKind;
   id: string;
   label: string;
   detail: string;
+  /** Absolute cspr.live URL when the result is verifiable on-chain. */
+  url?: string;
 }
 
 export class ExplorerService {
@@ -58,6 +62,13 @@ export class ExplorerService {
     for (const d of this.ledger.disputes.list()) {
       if (hit(d.dispute_id, d.respondent_agent, d.complainant, d.dispute_type)) {
         push({ kind: "dispute", id: d.dispute_id, label: d.dispute_id, detail: `${d.dispute_type} vs ${d.respondent_agent} · ${d.status}` });
+      }
+    }
+    // Real deployed contracts — resolvable on cspr.live by name or hash.
+    const manifest = loadChainManifest();
+    for (const c of manifest.contracts) {
+      if (hit(c.name, c.crate, c.contract_hash)) {
+        push({ kind: "contract", id: c.contract_hash, label: c.name, detail: `${manifest.chain} · ${c.status} · ${c.contract_hash.slice(0, 16)}…`, url: c.explorer_url });
       }
     }
     for (const ev of this.ledger.bus.all()) {

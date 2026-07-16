@@ -9,6 +9,7 @@ import { executeGraphQL, introspectionQuery } from "../lib/graphql/index.js";
 import { GRAPHIQL_HTML } from "../lib/graphql/explorer_html.js";
 import { renderMetrics } from "../lib/gateway/metrics.js";
 import { toCsv } from "../lib/services/csv.js";
+import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { renderCreditReportHtml } from "../lib/services/report_html.js";
 import type { CreditReport } from "../lib/services/credit_report.js";
 
@@ -89,6 +90,12 @@ function csvRows(state: ReturnType<typeof getState>, resource: string): Array<Re
       return state.ledger.receipts.list().map((r) => ({
         receipt_id: r.receipt_id, payer: r.payer_agent, seller: r.seller_agent,
         service_type: r.service_type, amount_motes: r.amount.toString(), status: r.status, timestamp: r.timestamp,
+      }));
+    case "events":
+      // Full on-chain event log for audit/observability — every contract call.
+      return state.ledger.bus.all().map((e) => ({
+        seq: e.seq, event: e.name, contract: e.contract, deploy_hash: e.deploy_hash,
+        timestamp: e.timestamp, data: JSON.stringify(e.data),
       }));
     case "leaderboard":
       return state.analytics().leaderboard.map((r) => ({ ...r }));
@@ -311,6 +318,10 @@ const server = createServer(async (req, res) => {
           return json(res, 200, state.ledger.bus.since(Number(url.searchParams.get("since") ?? 0)));
         case "/api/contracts":
           return json(res, 200, state.ledger.contractHashes);
+        case "/api/chain":
+          // Canonical Casper Testnet deployment manifest, with cspr.live links,
+          // so the console can make on-chain activity observable and verifiable.
+          return json(res, 200, loadChainManifest());
         case "/api/alerts":
           return json(res, 200, state.economy.watchdog.alerts);
         case "/api/passports":

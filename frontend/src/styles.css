@@ -31,6 +31,8 @@ h1, h2, h3 { margin: 0; }
 .status .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
 .status.online .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
 .status .policy { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--accent-2); }
+.chain-pill { padding: 3px 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--accent); text-decoration: none; font-size: 12px; white-space: nowrap; transition: .15s; }
+.chain-pill:hover { border-color: var(--accent); background: rgba(91,140,255,.08); }
 
 /* Casper Wallet connect button (real extension integration) */
 .wallet-btn { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 12px; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; transition: .15s; }
@@ -168,6 +170,46 @@ textarea.input { resize: vertical; }
 .cr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .cr-cols h4 { margin: 4px 0 8px; }
 @media (max-width: 640px) { .cr-cols { grid-template-columns: 1fr; } }
+
+/* On-chain observability: event feed controls + contract registry */
+.feed-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.feed-top h3 { margin: 0; }
+.feed-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.feed-live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); }
+.feed-live.on .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+.feed-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.feed-search { padding: 7px 11px; font-size: 13px; width: 100%; }
+.feed-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.feed-chip { cursor: pointer; user-select: none; text-transform: capitalize; }
+.feed-chip.sel { background: var(--accent); color: #fff; border-color: transparent; }
+.feed-chip.ok.sel { background: var(--ok); color: #08130d; }
+.feed-chip.bad.sel { background: var(--bad); color: #1a0808; }
+.feed-chip.warn.sel { background: var(--warn); color: #1a1300; }
+.feed-count { font-size: 11px; color: var(--muted); }
+.feed-item.open { border-left-width: 3px; }
+.feed-head.clickable { cursor: pointer; }
+.feed-json { margin: 6px 0 0; padding: 8px 10px; background: #0c0f16; border: 1px solid var(--border); border-radius: 8px; font-size: 11px; line-height: 1.5; color: #cfe3ff; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+.ev-contract-link { color: var(--accent-2); text-decoration: none; }
+.ev-contract-link:hover { text-decoration: underline; }
+.feed-page .feed-list { max-height: none; }
+
+.layout-onchain { display: grid; grid-template-columns: 1fr 380px; gap: 18px; align-items: start; }
+.onchain-main { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.onchain-feed { position: sticky; top: 18px; }
+.onchain-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.onchain-head h3 { margin: 0; }
+.mono-link { color: var(--accent-2); text-decoration: none; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+.mono-link:hover { text-decoration: underline; }
+.mono-sm { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+@media (max-width: 920px) { .layout-onchain { grid-template-columns: 1fr; } .onchain-feed { position: static; } }
+
+.row-focus td { background: rgba(91,140,255,.10); }
+.row-focus td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.focus-chip { cursor: pointer; align-self: flex-start; }
+
+.footer-label { font-size: 11px; color: var(--muted); padding: 4px 0; margin-right: 4px; align-self: center; }
+a.contract { text-decoration: none; cursor: pointer; transition: .15s; }
+a.contract:hover { border-color: var(--accent); color: var(--accent-2); }
 
 .csv-link { font-size: 12px; font-weight: 400; color: #7c8aff; margin-left: 10px; text-decoration: none; }
 .csv-link:hover { text-decoration: underline; }

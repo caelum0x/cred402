@@ -34,6 +34,12 @@ the same loop underwrites any agent that earns through x402. See the
 
 The console proxies `/api` + `/v1` to the API (same-origin via Vercel rewrites). The Render free instance cold-starts (~50 s) after idle.
 
+The **On-Chain** tab makes protocol activity observable: it renders the live
+contract registry (real hashes, each linked to [cspr.live](https://testnet.cspr.live)),
+the deployer account, per-contract event counts, and a filterable/​pausable event
+stream. Powered by `GET /api/chain` (the deployment manifest with explorer links)
+and `GET /api/export/events.csv` (the full on-chain event log).
+
 ### Casper Testnet contracts (live, on-chain)
 
 Deployed as real Odra (Rust→Wasm) contracts on **casper-test** (Casper 2.0) via the

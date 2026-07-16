@@ -259,6 +259,7 @@ export interface SearchResult {
   id: string;
   label: string;
   detail: string;
+  url?: string;
 }
 
 export async function search(q: string): Promise<SearchResult[]> {
@@ -1043,6 +1044,36 @@ export function getRiskScore(agentId: string): Promise<RiskScoreV2> {
 }
 export function getCreditCheck(agentId: string): Promise<CreditCheckResult> {
   return getV1<CreditCheckResult>(`/v1/credit/check/${encodeURIComponent(agentId)}`);
+}
+
+// ---------------------------------------------------------------------------
+// On-chain deployment manifest (real Casper Testnet contracts + cspr.live links)
+// ---------------------------------------------------------------------------
+
+export interface DeployedContract {
+  crate: string;
+  name: string;
+  contract_hash: string;
+  status: string;
+  explorer_url: string;
+}
+
+export interface ChainManifest {
+  chain: string;
+  mode: string;
+  node: string;
+  explorer: string;
+  deployer_public_key: string;
+  deployer_url: string;
+  deployed_at: string;
+  contract_count: number;
+  contracts: DeployedContract[];
+}
+
+export async function getChainManifest(): Promise<ChainManifest> {
+  const res = await fetch("/api/chain");
+  if (!res.ok) throw new Error(`chain manifest failed: ${res.status}`);
+  return res.json();
 }
 
 const MOTES = 1_000_000_000;

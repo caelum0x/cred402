@@ -13,6 +13,7 @@ const KIND_COLOR: Record<string, string> = {
   asset: "warn",
   credit_line: "ok",
   dispute: "bad",
+  contract: "ok",
   transaction: "",
 };
 
@@ -49,14 +50,15 @@ export function Explorer() {
       <div className="card wide">
         <h3>{loading ? "Searching…" : `${results.length} result${results.length === 1 ? "" : "s"}`}</h3>
         <table className="table">
-          <thead><tr><th>Kind</th><th>Id</th><th>Detail</th></tr></thead>
+          <thead><tr><th>Kind</th><th>Id</th><th>Detail</th><th></th></tr></thead>
           <tbody>
-            {results.length === 0 && !loading && <tr><td colSpan={3} className="muted">No matches. Try an agent name, “SOLAR”, a receipt id, or a hash.</td></tr>}
+            {results.length === 0 && !loading && <tr><td colSpan={4} className="muted">No matches. Try an agent name, “SOLAR”, a contract name, a receipt id, or a hash.</td></tr>}
             {results.map((r) => (
               <tr key={`${r.kind}:${r.id}`}>
-                <td><span className={`chip ${KIND_COLOR[r.kind] ?? ""}`}>{r.kind}</span></td>
+                <td><span className={`chip ${KIND_COLOR[r.kind] ?? ""}`}>{r.kind.replace("_", " ")}</span></td>
                 <td><code>{r.label}</code></td>
                 <td className="muted">{r.detail}</td>
+                <td>{r.url && <a className="csv-link" href={r.url} target="_blank" rel="noreferrer">cspr.live ↗</a>}</td>
               </tr>
             ))}
           </tbody>

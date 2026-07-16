@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLedger } from "./hooks/useLedger";
+import { useChainManifest } from "./hooks/useChainManifest";
+import { indexContracts } from "./lib/explorer";
 import { Agents } from "./components/Agents";
 import { Jobs } from "./components/Jobs";
 import { Receipts } from "./components/Receipts";
@@ -18,6 +20,7 @@ import { Bureau } from "./components/Bureau";
 import { Trust } from "./components/Trust";
 import { Discovery } from "./components/Discovery";
 import { Network } from "./components/Network";
+import { OnChain } from "./components/OnChain";
 import { X402Playground } from "./components/X402Playground";
 import { Onboard } from "./components/Onboard";
 import { Risk } from "./components/Risk";
@@ -26,12 +29,16 @@ import { WalletButton } from "./components/WalletButton";
 import { EventFeed } from "./components/EventFeed";
 import { Controls } from "./components/Controls";
 
-const TABS = ["Analytics", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
+const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
   const { snapshot, liveEvents, connected, refresh } = useLedger();
+  const manifest = useChainManifest();
   const [tab, setTab] = useState<Tab>("Analytics");
+
+  const feedEvents = liveEvents.length ? liveEvents : (snapshot?.events ?? []).slice().reverse();
+  const contractIndex = useMemo(() => indexContracts(manifest), [manifest]);
 
   return (
     <div className="app">
@@ -45,6 +52,11 @@ export function App() {
         </div>
         <div className={`status ${connected ? "online" : "offline"}`}>
           <span className="dot" /> {connected ? "streaming events" : "reconnecting…"}
+          {manifest && (
+            <a className="chain-pill" href={manifest.explorer} target="_blank" rel="noreferrer" title={`${manifest.contract_count} contracts live — open cspr.live`}>
+              ⛓ {manifest.chain} · {manifest.contract_count} contracts ↗
+            </a>
+          )}
           {snapshot && <span className="policy">policy {snapshot.policyVersion}</span>}
           <NotificationBell />
           <WalletButton />
@@ -65,6 +77,7 @@ export function App() {
         <section className="content">
           {!snapshot && <div className="empty">Loading on-chain state…</div>}
           {snapshot && tab === "Analytics" && <Analytics />}
+          {snapshot && tab === "On-Chain" && <OnChain manifest={manifest} events={feedEvents} connected={connected} />}
           {snapshot && tab === "Explorer" && <Explorer />}
           {snapshot && tab === "Developer" && <Developer />}
           {snapshot && tab === "Ops" && <Ops />}
@@ -87,17 +100,28 @@ export function App() {
           {snapshot && tab === "Compliance" && <Compliance />}
         </section>
         <aside className="sidebar">
-          <EventFeed events={liveEvents.length ? liveEvents : (snapshot?.events ?? []).slice().reverse()} />
+          <EventFeed events={feedEvents} connected={connected} contractIndex={contractIndex} />
         </aside>
       </main>
 
       <footer className="footer">
-        {snapshot &&
-          Object.entries(snapshot.contractHashes).map(([name, hash]) => (
-            <span key={name} className="contract" title={hash}>
+        {manifest ? (
+          <>
+            <span className="footer-label">{manifest.contract_count} contracts live on {manifest.chain} ↗</span>
+            {manifest.contracts.map((c) => (
+              <a key={c.contract_hash} className="contract" href={c.explorer_url} target="_blank" rel="noreferrer" title={`${c.name} · ${c.contract_hash}`}>
+                {c.name} ↗
+              </a>
+            ))}
+          </>
+        ) : (
+          snapshot &&
+          Object.keys(snapshot.contractHashes).map((name) => (
+            <span key={name} className="contract" title={name}>
               {name}
             </span>
-          ))}
+          ))
+        )}
       </footer>
     </div>
   );
