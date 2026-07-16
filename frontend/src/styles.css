@@ -203,6 +203,8 @@ textarea.input { resize: vertical; }
 .mono-sm { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 @media (max-width: 920px) { .layout-onchain { grid-template-columns: 1fr; } .onchain-feed { position: static; } }
 
+.onchain-links { white-space: nowrap; }
+.onchain-links .csv-link:first-child { margin-left: 0; }
 .row-focus td { background: rgba(91,140,255,.10); }
 .row-focus td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .focus-chip { cursor: pointer; align-self: flex-start; }

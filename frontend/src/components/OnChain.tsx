@@ -47,7 +47,7 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
         <div className="stat-row">
           <Stat label="Network" value={manifest.chain} accent />
           <Stat label="Contracts live" value={`${manifest.contract_count}`} />
-          <Stat label="Mode" value={manifest.mode} />
+          <Stat label="On-chain deploys" value={`${manifest.transaction_count}`} />
           <Stat label="Events this session" value={`${events.length}`} />
         </div>
 
@@ -73,7 +73,7 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
           </div>
           <p className="muted mono-sm" style={{ margin: "0 0 8px" }}>Click a contract to isolate its activity in the live feed →</p>
           <table className="table">
-            <thead><tr><th>Contract</th><th>Hash</th><th>Events</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Contract</th><th>Hash</th><th>Events</th><th>Status</th><th>On-chain</th></tr></thead>
             <tbody>
               {manifest.contracts.map((c) => {
                 const n = counts.get(c.name) ?? 0;
@@ -90,7 +90,10 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
                     </td>
                     <td>{n > 0 ? <span className="chip ok">{n}</span> : <span className="muted">—</span>}</td>
                     <td><span className={`chip ${c.status === "installed" ? "ok" : "warn"}`}>{c.status}</span></td>
-                    <td><a className="csv-link" href={c.explorer_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>cspr.live ↗</a></td>
+                    <td className="onchain-links">
+                      <a className="csv-link" href={c.explorer_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>contract ↗</a>
+                      {c.deploy_url && <a className="csv-link" href={c.deploy_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={c.deploy_hash}>tx ↗</a>}
+                    </td>
                   </tr>
                 );
               })}
@@ -100,6 +103,32 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
             Contract hashes are the real Odra (Rust→Wasm) contracts installed on {manifest.chain}. The event stream is the protocol's live event log for this session.
           </p>
         </div>
+
+        {manifest.transactions.length > 0 && (
+          <div className="card wide">
+            <div className="onchain-head">
+              <h3>On-chain transactions — deploys we made</h3>
+              <a className="csv-link" href={manifest.deployer_url} target="_blank" rel="noreferrer">all account txs ↗</a>
+            </div>
+            <p className="muted mono-sm" style={{ margin: "0 0 8px" }}>
+              The {manifest.transaction_count} real deploy transactions that installed the protocol on {manifest.chain}, newest first. Every hash opens the transaction on cspr.live.
+            </p>
+            <table className="table">
+              <thead><tr><th>Deploy hash</th><th>Contract</th><th>Block</th><th>When</th><th></th></tr></thead>
+              <tbody>
+                {manifest.transactions.map((tx) => (
+                  <tr key={tx.deploy_hash}>
+                    <td><code>{shortHash(tx.deploy_hash, 12)}</code></td>
+                    <td>{tx.contract ? <strong>{tx.contract}</strong> : <span className="muted">install</span>}</td>
+                    <td className="mono-sm">{tx.block_height.toLocaleString()}</td>
+                    <td className="muted mono-sm">{new Date(tx.timestamp).toLocaleDateString()}</td>
+                    <td><a className="csv-link" href={tx.deploy_url} target="_blank" rel="noreferrer">deploy ↗</a></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <aside className="onchain-feed">

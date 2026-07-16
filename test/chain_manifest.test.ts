@@ -47,6 +47,27 @@ test("chain manifest: url builders normalise a trailing slash on the base", () =
   );
 });
 
+test("chain manifest: exposes real install deploy transactions with cspr.live links", () => {
+  const m = loadChainManifest();
+  assert.ok(m.transaction_count > 0, "expected real deploy transactions");
+  assert.equal(m.transactions.length, m.transaction_count);
+  for (const tx of m.transactions) {
+    assert.match(tx.deploy_hash, /^[0-9a-f]{64}$/, "deploy hash must be a 32-byte hex");
+    assert.equal(tx.deploy_url, `${m.explorer}/deploy/${tx.deploy_hash}`);
+    assert.ok(tx.block_height > 0);
+  }
+});
+
+test("chain manifest: every contract links to its real install deploy tx", () => {
+  const m = loadChainManifest();
+  const known = new Set(m.transactions.map((t) => t.deploy_hash));
+  for (const c of m.contracts) {
+    assert.ok(c.deploy_hash, `${c.name} should map to an install deploy`);
+    assert.ok(known.has(c.deploy_hash!), "contract deploy hash must exist in the tx log");
+    assert.equal(c.deploy_url, `${m.explorer}/deploy/${c.deploy_hash}`);
+  }
+});
+
 test("chain manifest: repeated loads return a cached, stable manifest", () => {
   assert.deepEqual(loadChainManifest(), loadChainManifest());
 });

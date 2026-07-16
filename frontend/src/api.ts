@@ -1056,6 +1056,17 @@ export interface DeployedContract {
   contract_hash: string;
   status: string;
   explorer_url: string;
+  /** Real deploy hash + cspr.live link of the tx that installed this contract. */
+  deploy_hash?: string;
+  deploy_url?: string;
+}
+
+export interface DeployTransaction {
+  deploy_hash: string;
+  contract: string;
+  block_height: number;
+  timestamp: string;
+  deploy_url: string;
 }
 
 export interface ChainManifest {
@@ -1068,6 +1079,8 @@ export interface ChainManifest {
   deployed_at: string;
   contract_count: number;
   contracts: DeployedContract[];
+  transactions: DeployTransaction[];
+  transaction_count: number;
 }
 
 export async function getChainManifest(): Promise<ChainManifest> {
