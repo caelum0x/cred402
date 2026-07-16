@@ -44,6 +44,11 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
   return (
     <div className="layout-onchain">
       <section className="onchain-main">
+        <a className="chain-cta" href={manifest.deployer_url} target="_blank" rel="noreferrer">
+          <span className="chain-cta-main">⛓ Our Casper Testnet address — <code>{shortHash(manifest.deployer_public_key, 10)}</code></span>
+          <span className="chain-cta-sub">View all {manifest.transaction_count} on-chain deploy transactions &amp; activity on cspr.live ↗</span>
+        </a>
+
         <div className="stat-row">
           <Stat label="Network" value={manifest.chain} accent />
           <Stat label="Contracts live" value={`${manifest.contract_count}`} />

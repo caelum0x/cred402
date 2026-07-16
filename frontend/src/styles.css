@@ -57,6 +57,7 @@ h1, h2, h3 { margin: 0; }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
 .layout { display: grid; grid-template-columns: 1fr 330px; gap: 20px; align-items: start; }
+.layout.single { grid-template-columns: 1fr; }
 .content { min-height: 400px; }
 .empty { color: var(--muted); padding: 40px; text-align: center; }
 
@@ -203,6 +204,11 @@ textarea.input { resize: vertical; }
 .mono-sm { font-size: 11px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 @media (max-width: 920px) { .layout-onchain { grid-template-columns: 1fr; } .onchain-feed { position: static; } }
 
+.chain-cta { display: flex; flex-direction: column; gap: 3px; padding: 14px 18px; border-radius: var(--radius); text-decoration: none; border: 1px solid rgba(91,140,255,.4); background: linear-gradient(180deg, rgba(91,140,255,.14), rgba(91,140,255,.05)); transition: .15s; }
+.chain-cta:hover { border-color: var(--accent); background: linear-gradient(180deg, rgba(91,140,255,.22), rgba(91,140,255,.08)); }
+.chain-cta-main { font-size: 15px; font-weight: 600; color: var(--text); }
+.chain-cta-main code { font-size: 13px; color: var(--accent-2); }
+.chain-cta-sub { font-size: 12px; color: var(--accent); }
 .onchain-links { white-space: nowrap; }
 .onchain-links .csv-link:first-child { margin-left: 0; }
 .row-focus td { background: rgba(91,140,255,.10); }

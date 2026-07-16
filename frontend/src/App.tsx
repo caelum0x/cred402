@@ -73,7 +73,7 @@ export function App() {
         ))}
       </nav>
 
-      <main className="layout">
+      <main className={tab === "On-Chain" ? "layout single" : "layout"}>
         <section className="content">
           {!snapshot && <div className="empty">Loading on-chain state…</div>}
           {snapshot && tab === "Analytics" && <Analytics />}
@@ -99,9 +99,11 @@ export function App() {
           {snapshot && tab === "Trust" && <Trust />}
           {snapshot && tab === "Compliance" && <Compliance />}
         </section>
-        <aside className="sidebar">
-          <EventFeed events={feedEvents} connected={connected} contractIndex={contractIndex} />
-        </aside>
+        {tab !== "On-Chain" && (
+          <aside className="sidebar">
+            <EventFeed events={feedEvents} connected={connected} contractIndex={contractIndex} />
+          </aside>
+        )}
       </main>
 
       <footer className="footer">
