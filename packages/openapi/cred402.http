@@ -8,6 +8,9 @@
 GET {{base}}/v1/health
 
 ###
+GET {{base}}/v1/chain
+
+###
 GET {{base}}/metrics
 
 ### --- sign in with casper wallet ---

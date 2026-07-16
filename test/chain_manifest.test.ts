@@ -8,6 +8,7 @@ import {
 } from "../lib/services/chain_manifest.js";
 import { Ledger } from "../lib/ledger/index.js";
 import { ExplorerService } from "../lib/services/explorer.js";
+import { ServerState } from "../api/state.js";
 
 test("chain manifest: loads the real Casper Testnet deployment", () => {
   const m = loadChainManifest();
@@ -70,6 +71,15 @@ test("chain manifest: every contract links to its real install deploy tx", () =>
 
 test("chain manifest: repeated loads return a cached, stable manifest", () => {
   assert.deepEqual(loadChainManifest(), loadChainManifest());
+});
+
+test("parity: ServerState.chainManifest() backs the /v1/chain + /api/chain routes", () => {
+  const s = new ServerState();
+  const m = s.chainManifest();
+  assert.equal(m.chain, "casper-test");
+  assert.ok(m.contracts.length >= 14);
+  assert.ok(m.transaction_count > 0);
+  assert.deepEqual(m, loadChainManifest());
 });
 
 test("explorer: resolves a deployed contract by name with a cspr.live link", () => {

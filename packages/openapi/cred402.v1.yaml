@@ -74,6 +74,22 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/chain:
+    get:
+      tags: [System]
+      operationId: getChainManifest
+      summary: On-chain deployment manifest
+      description: "The canonical Casper Testnet deployment: every live Odra contract (with its `cspr.live` contract page + real install deploy transaction) and the full list of on-chain deploys we made. Powers on-chain observability. **Requires `read` scope.**"
+      responses:
+        "200":
+          description: On-chain deployment manifest with cspr.live links.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericObjectResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/health:
     get:
       tags: [System]

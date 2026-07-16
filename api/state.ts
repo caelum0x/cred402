@@ -54,6 +54,7 @@ import { buildReputationBreakdown } from "../lib/services/reputation_breakdown.j
 import { Cred402CreditOracle } from "../lib/services/credit_oracle.js";
 import { CrossChainReconciler } from "../lib/services/crosschain_reconciliation.js";
 import { CreditDataCommons } from "../lib/services/credit_data_commons.js";
+import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { RiskEngineV2 } from "../lib/services/risk_engine_v2.js";
 import { ServiceVerticals } from "../lib/services/service_verticals.js";
 
@@ -168,6 +169,12 @@ export class ServerState {
   /** Universal explorer search across the ledger. */
   search(query: string) {
     return new ExplorerService(this.ledger).search(query);
+  }
+
+  /** Canonical Casper Testnet deployment manifest: contracts + real install
+   * deploy transactions, each with a cspr.live explorer link (on-chain observability). */
+  chainManifest() {
+    return loadChainManifest();
   }
 
   /** Human notification feed derived from the event stream. */
