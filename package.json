@@ -40,7 +40,18 @@
     "demo:bureau": "tsx scripts/demo_bureau.ts",
     "record:demo": "node scripts/record_demo.mjs",
     "demo:x402": "tsx scripts/universal_credit_demo.ts",
-    "demo:gateway": "tsx scripts/gateway_demo.ts"
+    "demo:gateway": "tsx scripts/gateway_demo.ts",
+    "flare:credit": "tsx scripts/flare_credit.ts",
+    "keeperhub:execute": "tsx scripts/keeperhub_execute.ts",
+    "keeper:run": "tsx scripts/keeper_run.ts",
+    "automations:run": "tsx scripts/automations_run.ts",
+    "collateral:run": "tsx scripts/collateral_run.ts",
+    "x402:market": "tsx scripts/x402_market_run.ts",
+    "fassets:mint": "tsx scripts/fassets_mint_run.ts",
+    "scheduler:run": "tsx scripts/scheduler_run.ts",
+    "demo:grand": "tsx scripts/grand_demo.ts",
+    "record:hackathon": "node scripts/record_hackathon_demo.mjs",
+    "submit:check": "tsx scripts/submission_check.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

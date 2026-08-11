@@ -103,6 +103,7 @@ export function verifyPayment(args: {
   if (a.amount_motes !== challenge.amount_motes) return { ok: false, reason: "amount mismatch" };
   if (a.nonce !== challenge.nonce) return { ok: false, reason: "nonce mismatch" };
   if (a.seller_agent !== challenge.seller_agent) return { ok: false, reason: "seller mismatch" };
+  if (a.resource !== challenge.resource) return { ok: false, reason: "resource mismatch" };
   if (a.domain.network !== X402_DOMAIN.network) return { ok: false, reason: "wrong network" };
   // Reject expired challenges (replay window protection, p2 §14 threat 2).
   if (args.now !== undefined && args.now > challenge.expires_at) return { ok: false, reason: "challenge expired" };

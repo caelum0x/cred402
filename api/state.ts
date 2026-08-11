@@ -9,7 +9,7 @@ import { Marketplace } from "../lib/services/marketplace.js";
 import { ProtocolEconomics } from "../lib/core/economics.js";
 import { cspr, formatCspr } from "../lib/core/units.js";
 import { hashObject, shortId } from "../lib/core/hash.js";
-import { loadConfig, LedgerJournal } from "../lib/gateway/index.js";
+import { loadConfig, LedgerJournal, ApiError } from "../lib/gateway/index.js";
 import { ComplianceService } from "../lib/compliance/service.js";
 import { AnalyticsService } from "../lib/services/analytics.js";
 import { ExplorerService } from "../lib/services/explorer.js";
@@ -57,6 +57,17 @@ import { CreditDataCommons } from "../lib/services/credit_data_commons.js";
 import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { RiskEngineV2 } from "../lib/services/risk_engine_v2.js";
 import { ServiceVerticals } from "../lib/services/service_verticals.js";
+import { FlareCreditSatellite } from "../lib/flare/satellite.js";
+import { ConfidentialScorer } from "../lib/flare/confidential_score.js";
+import { PositionEngine } from "../lib/flare/positions.js";
+import { CreditKeeper } from "../lib/flare/keeper.js";
+import { AutomationEngine, type AutomationDef, type AutomationRun } from "../lib/flare/automations.js";
+import { CollateralVault } from "../lib/flare/collateral.js";
+import { FAssetsMinter } from "../lib/flare/fassets_mint.js";
+import { AutonomousScheduler } from "../lib/keeperhub/index.js";
+import { fxrpToXrp } from "../packages/chain-adapters/src/index.js";
+import { CreditServiceMarketplace } from "../lib/services/x402_marketplace.js";
+import { signPayment, type PaymentChallenge as X402Challenge } from "../lib/x402/index.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -655,6 +666,392 @@ export class ServerState {
     return this.economy.ledger;
   }
 
+  // ── Flare satellite (FXRP credit, FTSO-priced, KeeperHub-executed) ─────────
+  private _flare?: FlareCreditSatellite;
+  private _flareLedger?: Ledger;
+  private readonly _confidentialScorer = new ConfidentialScorer();
+  /** Persistent across ledger resets — posted collateral is user capital, not ledger state. */
+  private readonly _collateral = new CollateralVault();
+
+  /** Flare satellite bound to the CURRENT ledger — rebuilt automatically on reset. */
+  get flare(): FlareCreditSatellite {
+    if (!this._flare || this._flareLedger !== this.ledger) {
+      this._flare = new FlareCreditSatellite(this.ledger, { collateral: this._collateral });
+      this._flareLedger = this.ledger;
+    }
+    return this._flare;
+  }
+
+  flareInfo() {
+    return this.flare.info();
+  }
+  async flareXrpPrice() {
+    return this.flare.xrpUsd();
+  }
+  /** Draw FXRP credit (whole FXRP) — Casper CAN → FTSO price → KeeperHub execution. */
+  async flareDraw(agentId: string, amountFxrp: number) {
+    return this.flare.draw(agentId, toFxrpSmallestUnits(amountFxrp));
+  }
+  async flareRepay(agentId: string, amountFxrp: number) {
+    return this.flare.repay(agentId, toFxrpSmallestUnits(amountFxrp));
+  }
+  /** KeeperHub reliability summary for the console / API observability. */
+  keeperhubReliability() {
+    return this.flare.reliability();
+  }
+  keeperhubAudit(agentId?: string) {
+    return this.flare.auditTrail(agentId);
+  }
+  /** Confidential (TEE-attested) credit score — raw features never leave the enclave. */
+  async confidentialScore(agentId: string) {
+    const rs = new RiskEngineV2(this.ledger).score(agentId);
+    if ("error" in rs) return rs;
+    return this._confidentialScorer.score(rs.agent_id, rs.features);
+  }
+
+  /** Combined Flare + KeeperHub console view: satellite info, FTSO price, reliability, audit. */
+  async flareView() {
+    return {
+      info: this.flare.info(),
+      price: await this.flare.xrpUsd(),
+      reliability: this.flare.reliability(),
+      audit: this.flare.auditTrail(),
+      seller: this.economy.seller.agent_id,
+    };
+  }
+
+  /** Run one Flare credit loop on the shared state (draw → repay) for the console. */
+  async runFlareDemo(amountFxrp = 500) {
+    const agentId = this.economy.seller.agent_id;
+    const draw = await this.flareDraw(agentId, amountFxrp);
+    const repay = await this.flareRepay(agentId, amountFxrp);
+    const confidential = await this.confidentialScore(agentId);
+    return { draw, repay, confidential, reliability: this.flare.reliability(), audit: this.flare.auditTrail() };
+  }
+
+  // ── Autonomous Credit Keeper (FTSO position health → KeeperHub execution) ──
+  /** FTSO position-health assessment for one agent, with an optional what-if price. */
+  async flarePosition(agentId: string, priceOverride?: number) {
+    const engine = new PositionEngine(this.flare.vault, this.ledger, this.flare.priceClient, {}, this.flare.collateral);
+    return engine.assess(agentId, { priceOverride });
+  }
+  /** Post FTSO-priced collateral to expand an agent's borrowing power. */
+  async depositCollateral(agentId: string, symbol: string, amount: number) {
+    this.requireAgent(agentId);
+    const res = this.flare.collateral.deposit(agentId, symbol, amount);
+    return { ...res, valuation: await this.flare.collateral.valueUsd(agentId), position: await this.flarePosition(agentId) };
+  }
+  async withdrawCollateral(agentId: string, symbol: string, amount: number) {
+    this.requireAgent(agentId);
+    const res = this.flare.collateral.withdraw(agentId, symbol, amount);
+    return { ...res, valuation: await this.flare.collateral.valueUsd(agentId), position: await this.flarePosition(agentId) };
+  }
+  private requireAgent(agentId: string): void {
+    if (!this.ledger.agents.get(agentId)) throw new ApiError(404, "not_found", `unknown agent: ${agentId}`);
+  }
+  async collateralValue(agentId: string) {
+    return this.flare.collateral.valueUsd(agentId);
+  }
+
+  // ── FAssets: mint FXRP from attested XRP, then collateralize ───────────────
+  /** Persistent — minted FXRP balances are user capital, not ledger state. */
+  private readonly _minter = new FAssetsMinter();
+  get minter(): FAssetsMinter {
+    return this._minter;
+  }
+  /** Mint FXRP for an agent (reserve → FDC-attest the XRPL payment → executeMinting). */
+  async mintFxrp(agentId: string, xrp: number) {
+    this.requireAgent(agentId);
+    if (!Number.isFinite(xrp) || xrp <= 0) throw new ApiError(400, "bad_request", "xrp must be a positive finite number");
+    return this._minter.mint(agentId, BigInt(Math.round(xrp * 1e6)));
+  }
+  redeemFxrp(agentId: string, fxrp: number) {
+    this.requireAgent(agentId);
+    if (!Number.isFinite(fxrp) || fxrp <= 0) throw new ApiError(400, "bad_request", "fxrp must be a positive finite number");
+    try {
+      return this._minter.redeem(agentId, BigInt(Math.round(fxrp * 1e6)));
+    } catch (err) {
+      throw new ApiError(400, "bad_request", (err as Error).message);
+    }
+  }
+  // ── Autonomous scheduler (KeeperHub cron) — runs the last mile unattended ──
+  private _scheduler?: AutonomousScheduler;
+  /** Persistent scheduler; DEFAULT OFF so nothing executes autonomously until started. */
+  get scheduler(): AutonomousScheduler {
+    if (!this._scheduler) {
+      const s = new AutonomousScheduler();
+      s.addJob({ name: "keeper-sweep", interval_sec: 60, run: () => this.keeperRunFleet() });
+      s.addJob({ name: "automation-tick", interval_sec: 30, run: () => this.tickAutomations() });
+      this._scheduler = s;
+    }
+    return this._scheduler;
+  }
+  schedulerStatus() {
+    return this.scheduler.status();
+  }
+  schedulerStart(intervalMs?: number) {
+    this.scheduler.start(intervalMs ?? 15_000);
+    return this.scheduler.status();
+  }
+  schedulerStop() {
+    this.scheduler.stop();
+    return this.scheduler.status();
+  }
+  /** Run one scheduler tick now (executes any due jobs) — for the console/CLI demo. */
+  async schedulerTick() {
+    const runs = await this.scheduler.tick();
+    return { runs, status: this.scheduler.status() };
+  }
+
+  fassetsStatus(agentId: string) {
+    return {
+      agent_id: agentId,
+      fxrp_balance: fxrpToXrp(this._minter.balanceOf(agentId)),
+      reservations: this._minter.reservationsFor(agentId),
+      total_supply: fxrpToXrp(this._minter.totalSupply()),
+      fdc_live: this._minter.liveFdc,
+    };
+  }
+  /**
+   * The full interoperable-asset loop: bring XRP → mint FXRP (FDC-attested) → post it
+   * as FTSO-priced collateral, expanding the agent's borrowing power with no repay.
+   */
+  async mintAndCollateralize(agentId: string, xrp: number) {
+    const mint = await this.mintFxrp(agentId, xrp);
+    const before = await this.flarePosition(agentId);
+    // FXRP is XRP 1:1 on the same FTSO XRP/USD feed → post it as XRP collateral. The
+    // FXRP LEAVES the wallet (debit) and is locked in the collateral vault, so the same
+    // FXRP is never counted both as a balance and as collateral.
+    this.flare.collateral.deposit(agentId, "XRP", fxrpToXrp(BigInt(mint.fxrp_minted)));
+    this._minter.debit(agentId, BigInt(mint.fxrp_minted));
+    const after = await this.flarePosition(agentId);
+    return { mint, valuation: await this.flare.collateral.valueUsd(agentId), before, after };
+  }
+
+  // ── x402 Credit-Service Marketplace (pay-per-call credit intelligence) ─────
+  private _marketplace?: CreditServiceMarketplace;
+  /** Persistent x402 credit-service marketplace — its receipts are Cred402's own revenue. */
+  get serviceMarket(): CreditServiceMarketplace {
+    if (!this._marketplace) {
+      this._marketplace = new CreditServiceMarketplace(
+        this.economy.seller.agent_id,
+        (id, params) => this.runService(id, params),
+        {
+          onReceipt: (r) => this.anchorMarketplaceReceipt(r),
+          // A registered payer must sign with its own key; unknown payers are anonymous.
+          authenticatePayer: (payerAgent, payerPublicKey) => {
+            const a = this.ledger.agents.get(payerAgent);
+            return !a || a.agent_public_key === payerPublicKey;
+          },
+        },
+      );
+    }
+    return this._marketplace;
+  }
+  private async runService(id: string, params: Record<string, unknown>): Promise<unknown> {
+    switch (id) {
+      case "credit-check":
+        return this.creditCheck(String(params.agent_id));
+      case "confidential-score":
+        return this.confidentialScore(String(params.agent_id));
+      case "position-health":
+        return this.flarePosition(String(params.agent_id));
+      case "risk-score":
+        return this.riskScoreV2(String(params.agent_id));
+      case "underwrite": {
+        const num = (v: unknown) => (v === undefined || v === null || v === "" ? undefined : Number(v));
+        return this.simulateCredit({
+          monthly_revenue_cspr: Number(params.monthly_revenue_cspr),
+          stake_cspr: num(params.stake_cspr),
+          reputation: num(params.reputation),
+          accuracy: num(params.accuracy),
+          dispute_rate: num(params.dispute_rate),
+          jobs_completed: num(params.jobs_completed),
+          service_type: params.service_type ? String(params.service_type) : undefined,
+        } as SimulationInput);
+      }
+      default:
+        throw new Error(`unknown service: ${id}`);
+    }
+  }
+  /** Anchor a paid marketplace call as a real x402 receipt and run the full revenue →
+   * reputation loop (settle → finalize → record job → +reputation), so paid calls
+   * genuinely make the seller more creditworthy. Best-effort: never fails the call. */
+  private anchorMarketplaceReceipt(r: { payer_agent: string; seller_agent: string; service_type: string; amount_motes: string; resource: string; payment_proof_hash: string; nonce: string }): void {
+    try {
+      const receipt = this.ledger.receipts.record_receipt({
+        payer_agent: r.payer_agent,
+        seller_agent: r.seller_agent,
+        service_type: r.service_type,
+        amount: BigInt(r.amount_motes),
+        rwa_reference_hash: hashObject({ resource: r.resource }),
+        result_hash: "",
+        payment_proof_hash: r.payment_proof_hash,
+        nonce: r.nonce,
+      });
+      this.ledger.receipts.settle_receipt(receipt.receipt_id);
+      this.ledger.receipts.finalize_receipt(receipt.receipt_id);
+      // Only credit reputation to a registered seller (the marketplace seller is).
+      if (this.ledger.agents.get(r.seller_agent)) {
+        this.ledger.agents.record_job(
+          r.seller_agent,
+          { receipt_id: receipt.receipt_id, amount: BigInt(r.amount_motes), timestamp: this.ledger.clock.now(), service_type: r.service_type },
+          92,
+          false,
+        );
+        this.ledger.agents.update_reputation(r.seller_agent, +1, r.payment_proof_hash, "FINALIZED_X402_SERVICE");
+      }
+    } catch {
+      /* best-effort anchoring — a duplicate/expired proof must not fail the paid call */
+    }
+  }
+  listServices() {
+    return this.serviceMarket.listings();
+  }
+  serviceMarketStats() {
+    return this.serviceMarket.stats();
+  }
+  marketplaceReceipts() {
+    return this.serviceMarket.receiptLog();
+  }
+  /** Raw 402-gated call: no X-Payment → 402 challenge; valid proof → verify + run. */
+  callService(serviceId: string, paymentHeader: string | undefined, params: Record<string, unknown>) {
+    return this.serviceMarket.call(serviceId, paymentHeader, params);
+  }
+  /**
+   * Self-paying demo: run the full 402 → sign → 200 flow using a buyer agent's key, so
+   * the console/CLI can show a real x402 purchase end to end.
+   */
+  async demoBuyService(serviceId: string, params: Record<string, unknown>) {
+    const buyer = this.economy.buyer;
+    const challenged = await this.callService(serviceId, undefined, params);
+    if (challenged.kind !== "challenge") return challenged; // rejected (bad params / unknown)
+    const challenge = (challenged.body as { challenge: X402Challenge }).challenge;
+    const { header } = signPayment({
+      challenge,
+      payer_agent: buyer.agent_id,
+      payer_public_key: buyer.publicKeyHex,
+      payer_private_pem: buyer.keys.privatePem,
+    });
+    const paid = await this.callService(serviceId, header, params);
+    return { challenge, paid };
+  }
+  /** Read-only collateral view for the console (seller's basket + position). Safe to poll. */
+  async collateralView() {
+    const agentId = this.economy.seller.agent_id;
+    return { agent_id: agentId, valuation: await this.flare.collateral.valueUsd(agentId), position: await this.flarePosition(agentId) };
+  }
+  /**
+   * Console demo: open a margin-called FXRP position, then post FTSO-priced collateral
+   * (3,000 USDC) to expand borrowing power and cure the position — no repay needed.
+   */
+  async runCollateralDemo() {
+    const agentId = this.economy.seller.agent_id;
+    if (this.flare.vault.debtOf(agentId) === 0n) await this.flareDraw(agentId, 8500); // ~$4,420 vs $5,000 cap → margin call
+    const before = await this.flarePosition(agentId);
+    this.flare.collateral.deposit(agentId, "USDC", 3000); // +$2,850 borrowing power (95% LTV)
+    const after = await this.flarePosition(agentId);
+    return { before, after, valuation: await this.flare.collateral.valueUsd(agentId) };
+  }
+  /** What the keeper would do for one agent (no execution). */
+  async keeperEvaluate(agentId: string) {
+    return new CreditKeeper(this.flare, this.ledger).evaluate(agentId);
+  }
+  /** Run the keeper for one agent — executes a protective deleverage via KeeperHub. */
+  async keeperRun(agentId: string) {
+    return new CreditKeeper(this.flare, this.ledger).run(agentId);
+  }
+  /** Run the keeper across every registered agent; returns per-agent results + rollup. */
+  async keeperRunFleet() {
+    const ids = this.ledger.agents.list().map((a) => a.agent_id);
+    return new CreditKeeper(this.flare, this.ledger).runFleet(ids);
+  }
+  /** Read-only fleet evaluation for the console (never executes) — safe to poll. */
+  async keeperEvaluateFleet() {
+    const keeper = new CreditKeeper(this.flare, this.ledger, { dryRun: true });
+    const ids = this.ledger.agents.list().map((a) => a.agent_id);
+    const results = [];
+    for (const id of ids) results.push(await keeper.run(id));
+    const byStatus: Record<string, number> = {};
+    for (const r of results) byStatus[r.position.status] = (byStatus[r.position.status] ?? 0) + 1;
+    return {
+      results,
+      summary: {
+        evaluated: results.length,
+        at_risk: results.filter((r) => r.action !== "none").length,
+        by_status: byStatus,
+      },
+      reliability: this.flare.reliability(),
+    };
+  }
+
+  // ── Credit Automations (declarative price/health/schedule credit rules) ────
+  /** Persistent across ledger resets — automations are user-declared policy, not ledger state. */
+  private readonly automations = new AutomationEngine();
+  private _lastAutomationRuns: AutomationRun[] = [];
+
+  async createAutomation(def: AutomationDef) {
+    return this.automations.register(def);
+  }
+  listAutomations(agentId?: string) {
+    return this.automations.list(agentId);
+  }
+  removeAutomation(id: string) {
+    return { removed: this.automations.remove(id) };
+  }
+  toggleAutomation(id: string, enabled: boolean) {
+    return this.automations.setEnabled(id, enabled) ?? { error: `unknown automation: ${id}` };
+  }
+  /** Evaluate all automations against live FTSO + position state; execute due ones via KeeperHub. */
+  async tickAutomations() {
+    const runs = await this.automations.tick({ satellite: this.flare, ledger: this.ledger });
+    if (runs.length) this._lastAutomationRuns = runs;
+    return { runs, automations: this.automations.list() };
+  }
+  /** Read-only automations view for the console (list + last runs). Safe to poll. */
+  automationsView() {
+    return { automations: this.automations.list(), last_runs: this._lastAutomationRuns, reliability: this.flare.reliability() };
+  }
+
+  /**
+   * Console demo: register a price-trigger and a health-trigger automation, open a
+   * risky FXRP position, then tick — the automations fire and deleverage via KeeperHub.
+   */
+  async runAutomationsDemo() {
+    const agentId = this.economy.seller.agent_id;
+    const created = [
+      await this.automations.register({
+        agent_id: agentId,
+        name: "guard-hf-1.4",
+        trigger: { kind: "health_below", threshold: 1.4 },
+        action: { kind: "deleverage", target_hf: 2.0 },
+      }),
+      await this.automations.register({
+        agent_id: agentId,
+        name: "derisk-if-xrp-above-0.40",
+        trigger: { kind: "price_above", price: 0.4 },
+        action: { kind: "deleverage", target_hf: 2.0 },
+      }),
+    ];
+    const draw = await this.flareDraw(agentId, 8500); // trips health_below 1.4
+    const tick = await this.tickAutomations();
+    const after = await this.flarePosition(agentId);
+    return { created, draw, runs: tick.runs, after, reliability: this.flare.reliability() };
+  }
+
+  /**
+   * Console demo: draw a large FXRP position that trips a margin call, then let the
+   * keeper autonomously deleverage it through KeeperHub. Populates the Keeper panel.
+   */
+  async runKeeperDemo() {
+    const agentId = this.economy.seller.agent_id;
+    const draw = await this.flareDraw(agentId, 8500); // ~$4,420 vs $5,000 cap → margin call
+    const before = await this.flarePosition(agentId);
+    const keeper = await this.keeperRun(agentId);
+    const after = await this.flarePosition(agentId);
+    return { draw, before, keeper, after, reliability: this.flare.reliability() };
+  }
+
   /** Fraud reports for every agent (p2 §7.8). */
   fraudReports() {
     const svc = new FraudService(this.ledger);
@@ -885,7 +1282,20 @@ export class ServerState {
     this.attestations = new AttestationGraph(this.ledger);
     this.creditOffers = new CreditOffers(this.ledger, this.economy.credit);
     this.pendingChallenges.clear();
+    // Rebuild the x402 marketplace against the new ledger so its receipts/revenue
+    // stay consistent with the (reset) ledger-anchored receipts.
+    this._marketplace = undefined;
+    // Halt autonomous execution across a reset (a fresh economy starts idle).
+    this._scheduler?.stop();
   }
+}
+
+/** Validate a whole-FXRP amount and convert to 6dp smallest units, or 400. */
+function toFxrpSmallestUnits(amountFxrp: number): bigint {
+  if (!Number.isFinite(amountFxrp) || amountFxrp <= 0) {
+    throw new ApiError(400, "bad_request", "amount_fxrp must be a positive finite number");
+  }
+  return BigInt(Math.round(amountFxrp * 1e6));
 }
 
 let _state: ServerState | null = null;

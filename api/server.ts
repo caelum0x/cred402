@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve, extname, normalize } from "node:path";
 import { getState } from "./state.js";
 import { handlePaidEvidence } from "./paid_evidence_server/index.js";
-import { Gateway, loadConfig } from "../lib/gateway/index.js";
+import { Gateway, loadConfig, toApiError } from "../lib/gateway/index.js";
 import { V1Router } from "./v1/router.js";
 import { executeGraphQL, introspectionQuery } from "../lib/graphql/index.js";
 import { GRAPHIQL_HTML } from "../lib/graphql/explorer_html.js";
@@ -273,6 +273,29 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // ---- x402 Credit-Service Marketplace: pay-per-call credit intelligence ----
+    if (pathname.startsWith("/x402/services/")) {
+      const serviceId = pathname.replace("/x402/services/", "").split("/")[0] ?? "";
+      const paymentHeader = typeof req.headers["x-payment"] === "string" ? (req.headers["x-payment"] as string) : undefined;
+      const params: Record<string, unknown> = {};
+      for (const [k, v] of url.searchParams.entries()) params[k] = v;
+      if (req.method === "POST") {
+        try {
+          Object.assign(params, ((await readBody(req)) as Record<string, unknown>) ?? {});
+        } catch {
+          return json(res, 400, { error: "malformed JSON body" });
+        }
+      }
+      const decision = await state.callService(serviceId, paymentHeader, params);
+      if (decision.kind === "challenge") {
+        res.writeHead(402, { ...decision.headers });
+        res.end(JSON.stringify(decision.body));
+        return;
+      }
+      if (decision.kind === "rejected") return json(res, decision.status, decision.body);
+      return json(res, 200, { result: decision.result, receipt: decision.receipt, payer: decision.payer_agent });
+    }
+
     // ---- SSE event stream ----
     if (pathname === "/api/events/stream") {
       res.writeHead(200, {
@@ -347,6 +370,20 @@ const server = createServer(async (req, res) => {
           });
         case "/api/realfi":
           return json(res, 200, state.realfiState());
+        case "/api/flare":
+          return json(res, 200, await state.flareView());
+        case "/api/keeper":
+          return json(res, 200, await state.keeperEvaluateFleet());
+        case "/api/automations":
+          return json(res, 200, state.automationsView());
+        case "/api/collateral":
+          return json(res, 200, await state.collateralView());
+        case "/api/marketplace/services":
+          return json(res, 200, { services: state.listServices(), stats: state.serviceMarketStats(), receipts: state.marketplaceReceipts() });
+        case "/api/fassets":
+          return json(res, 200, state.fassetsStatus(state.economy.seller.agent_id));
+        case "/api/scheduler":
+          return json(res, 200, state.schedulerStatus());
         case "/api/x402/facilitator": {
           // Real Casper x402 facilitator status (p9), live when configured.
           const { facilitatorFromEnv } = await import("../lib/x402/index.js");
@@ -409,6 +446,33 @@ const server = createServer(async (req, res) => {
           return json(res, 200, { scenes: await state.runMultichain() });
         case "/api/demo/realfi":
           return json(res, 200, { scenes: state.runRealFi() });
+        case "/api/demo/flare": {
+          const b = (await readBody(req)) as { amount_fxrp?: number };
+          const amt = Number(b.amount_fxrp ?? 500);
+          if (!Number.isFinite(amt) || amt <= 0) return json(res, 400, { error: "amount_fxrp must be a positive finite number" });
+          return json(res, 200, await state.runFlareDemo(amt));
+        }
+        case "/api/demo/keeper":
+          return json(res, 200, await state.runKeeperDemo());
+        case "/api/demo/automations":
+          return json(res, 200, await state.runAutomationsDemo());
+        case "/api/demo/collateral":
+          return json(res, 200, await state.runCollateralDemo());
+        case "/api/demo/buy-service": {
+          const b = (await readBody(req)) as { service_id?: string; agent_id?: string };
+          const svc = b.service_id ?? "credit-check";
+          return json(res, 200, await state.demoBuyService(svc, { agent_id: b.agent_id ?? state.economy.seller.agent_id, monthly_revenue_cspr: 120 }));
+        }
+        case "/api/demo/fassets": {
+          const b = (await readBody(req)) as { xrp?: number };
+          return json(res, 200, await state.mintAndCollateralize(state.economy.seller.agent_id, Number(b.xrp ?? 3000)));
+        }
+        case "/api/scheduler/tick":
+          return json(res, 200, await state.schedulerTick());
+        case "/api/scheduler/start":
+          return json(res, 200, state.schedulerStart());
+        case "/api/scheduler/stop":
+          return json(res, 200, state.schedulerStop());
         case "/api/x402/buy": {
           const b = (await readBody(req)) as { evidence_type?: string; tampered?: boolean };
           return json(res, 200, await state.x402Buy(b.evidence_type ?? "energy_output", Boolean(b.tampered)));
@@ -557,7 +621,9 @@ const server = createServer(async (req, res) => {
 
     json(res, 404, { error: `no route for ${req.method} ${pathname}` });
   } catch (err) {
-    json(res, 500, { error: (err as Error).message });
+    // Translate a typed ApiError to its status (validation → 400/404), else 500.
+    const apiErr = toApiError(err);
+    json(res, apiErr.status, { error: apiErr.message, code: apiErr.code });
   }
 });
 

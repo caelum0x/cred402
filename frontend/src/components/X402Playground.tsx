@@ -1,5 +1,84 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { x402Buy, fmtCspr, type X402Trace } from "../api";
+
+interface ServiceListing {
+  id: string;
+  name: string;
+  description: string;
+  price_cspr: number;
+  resource: string;
+  calls: number;
+  revenue_motes: string;
+}
+interface ServiceMarketView {
+  services: ServiceListing[];
+  stats: { total_calls: number; total_revenue_motes: string; by_service: Record<string, number> };
+}
+
+function ServiceMarket() {
+  const [view, setView] = useState<ServiceMarketView | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = () =>
+    fetch("/api/marketplace/services")
+      .then((r) => r.json())
+      .then((b) => setView(b as ServiceMarketView))
+      .catch(() => setView(null));
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  const buy = async (serviceId: string) => {
+    setBusy(serviceId);
+    try {
+      await fetch("/api/demo/buy-service", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ service_id: serviceId }) });
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  if (!view) return null;
+  return (
+    <div className="card wide">
+      <h3>x402 Credit-Service Marketplace — pay-per-call credit intelligence</h3>
+      <div className="caps">
+        <span className="chip accent">calls {view.stats.total_calls}</span>
+        <span className="chip ok">revenue {fmtCspr(view.stats.total_revenue_motes, 4)} CSPR</span>
+        <span className="chip">every paid call → a Cred402 x402 receipt (revenue → reputation)</span>
+      </div>
+      <table className="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Price</th>
+            <th>Calls</th>
+            <th>Revenue</th>
+            <th />
+          </tr>
+        </thead>
+        <tbody>
+          {view.services.map((s) => (
+            <tr key={s.id}>
+              <td title={s.description}>{s.name}</td>
+              <td>{s.price_cspr} CSPR</td>
+              <td>{s.calls}</td>
+              <td>{fmtCspr(s.revenue_motes, 4)} CSPR</td>
+              <td>
+                <button className="tab" disabled={busy !== null} onClick={() => buy(s.id)}>
+                  {busy === s.id ? "buying…" : "buy (402→pay→200)"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 /**
  * x402 playground — run the protocol's core machine-to-machine payment live:
@@ -38,6 +117,9 @@ export function X402Playground() {
           <button className="btn primary" disabled={busy} onClick={run}>{busy ? "Running…" : "▶ Run x402 purchase"}</button>
         </div>
       </div>
+
+      <ServiceMarket />
+
 
       {trace && (
         <>

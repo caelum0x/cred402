@@ -39,6 +39,16 @@ import { RiskEngineV2 } from "../lib/services/risk_engine_v2.js";
 import { CreditDataCommons } from "../lib/services/credit_data_commons.js";
 import { CrossChainReconciler } from "../lib/services/crosschain_reconciliation.js";
 import { ServiceVerticals } from "../lib/services/service_verticals.js";
+import { FlareCreditSatellite } from "../lib/flare/satellite.js";
+import { ConfidentialScorer } from "../lib/flare/confidential_score.js";
+import { PositionEngine } from "../lib/flare/positions.js";
+import { CreditKeeper } from "../lib/flare/keeper.js";
+import { AutomationEngine, type AutomationDef } from "../lib/flare/automations.js";
+import { CreditServiceMarketplace } from "../lib/services/x402_marketplace.js";
+import { signPayment } from "../lib/x402/index.js";
+import { FAssetsMinter } from "../lib/flare/fassets_mint.js";
+import { fxrpToXrp } from "../packages/chain-adapters/src/index.js";
+import { AutonomousScheduler } from "../lib/keeperhub/index.js";
 
 /**
  * Cred402 MCP tool registry (p2 §12).
@@ -57,6 +67,13 @@ export interface ToolDef {
 
 const str = (d: string) => ({ type: "string", description: d });
 const num = (d: string) => ({ type: "number", description: d });
+
+/** Parse a whole-FXRP tool argument to 6dp smallest units, or null if invalid. */
+function fxrpSmallestUnits(v: unknown): bigint | null {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return BigInt(Math.round(n * 1e6));
+}
 
 function jsonSafe(v: unknown): unknown {
   return JSON.parse(JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? x.toString() : x)));
@@ -83,6 +100,105 @@ function creditOffers(econ: Cred402Economy): CreditOffers {
     offerBooks.set(econ, o);
   }
   return o;
+}
+
+// One Flare satellite per economy — Casper-issued CANs → FXRP credit priced by FTSO
+// → executed on-chain through KeeperHub. Shares the ledger's policy key + exposure.
+const flareSatellites = new WeakMap<Cred402Economy, FlareCreditSatellite>();
+function flareSatellite(econ: Cred402Economy): FlareCreditSatellite {
+  let s = flareSatellites.get(econ);
+  if (!s) {
+    s = new FlareCreditSatellite(econ.ledger);
+    flareSatellites.set(econ, s);
+  }
+  return s;
+}
+
+// One Flare Confidential Compute scorer per economy.
+const confidentialScorers = new WeakMap<Cred402Economy, ConfidentialScorer>();
+function confidentialScorer(econ: Cred402Economy): ConfidentialScorer {
+  let c = confidentialScorers.get(econ);
+  if (!c) {
+    c = new ConfidentialScorer();
+    confidentialScorers.set(econ, c);
+  }
+  return c;
+}
+
+// One Credit Automation engine per economy, so create/list/tick share state in a session.
+const automationEngines = new WeakMap<Cred402Economy, AutomationEngine>();
+function automationEngine(econ: Cred402Economy): AutomationEngine {
+  let a = automationEngines.get(econ);
+  if (!a) {
+    a = new AutomationEngine();
+    automationEngines.set(econ, a);
+  }
+  return a;
+}
+
+// One x402 credit-service marketplace per economy, so receipts accumulate in a session.
+const marketplaces = new WeakMap<Cred402Economy, CreditServiceMarketplace>();
+function marketplace(econ: Cred402Economy): CreditServiceMarketplace {
+  let m = marketplaces.get(econ);
+  if (!m) {
+    m = new CreditServiceMarketplace(econ.seller.agent_id, (id, params) => runMcpService(econ, id, params));
+    marketplaces.set(econ, m);
+  }
+  return m;
+}
+// One FAssets minter per economy, so mint balances persist within a session.
+const minters = new WeakMap<Cred402Economy, FAssetsMinter>();
+function minter(econ: Cred402Economy): FAssetsMinter {
+  let m = minters.get(econ);
+  if (!m) {
+    m = new FAssetsMinter();
+    minters.set(econ, m);
+  }
+  return m;
+}
+
+// One autonomous scheduler per economy (keeper sweep + automation tick jobs).
+const schedulers = new WeakMap<Cred402Economy, AutonomousScheduler>();
+function scheduler(econ: Cred402Economy): AutonomousScheduler {
+  let s = schedulers.get(econ);
+  if (!s) {
+    s = new AutonomousScheduler();
+    s.addJob({
+      name: "keeper-sweep",
+      interval_sec: 60,
+      run: () => new CreditKeeper(flareSatellite(econ), econ.ledger).runFleet(econ.ledger.agents.list().map((a) => a.agent_id)),
+    });
+    s.addJob({
+      name: "automation-tick",
+      interval_sec: 30,
+      run: () => automationEngine(econ).tick({ satellite: flareSatellite(econ), ledger: econ.ledger }),
+    });
+    schedulers.set(econ, s);
+  }
+  return s;
+}
+
+async function runMcpService(econ: Cred402Economy, id: string, params: Record<string, unknown>): Promise<unknown> {
+  const agentId = String(params.agent_id ?? "");
+  switch (id) {
+    case "credit-check":
+      return jsonSafe(new Cred402CreditOracle(econ.ledger).creditCheck(agentId));
+    case "confidential-score": {
+      const rs = new RiskEngineV2(econ.ledger).score(agentId);
+      if ("error" in rs) return rs;
+      return jsonSafe(await confidentialScorer(econ).score(rs.agent_id, rs.features));
+    }
+    case "position-health": {
+      const sat = flareSatellite(econ);
+      return jsonSafe(await new PositionEngine(sat.vault, econ.ledger, sat.priceClient, {}, sat.collateral).assess(agentId));
+    }
+    case "risk-score":
+      return jsonSafe(new RiskEngineV2(econ.ledger).score(agentId));
+    case "underwrite":
+      return jsonSafe(simulateUnderwriting(econ.ledger, { monthly_revenue_cspr: Number(params.monthly_revenue_cspr) }));
+    default:
+      throw new Error(`unknown service: ${id}`);
+  }
 }
 
 export const TOOLS: ToolDef[] = [
@@ -574,6 +690,284 @@ export const TOOLS: ToolDef[] = [
     inputSchema: { type: "object", properties: {}, required: [] },
     handler: () => jsonSafe(new ServiceVerticals().list()),
   },
+  // ── Flare satellite (interoperable FXRP credit) + KeeperHub execution ──────
+  {
+    name: "cred402.flare_info",
+    description: "Flare satellite status: network (Coston2/Songbird/Flare), FXRP pool + liquidity, and whether the real FTSO price feed and real KeeperHub execution are live.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(flareSatellite(econ).info()),
+  },
+  {
+    name: "cred402.flare_xrp_price",
+    description: "Live XRP/USD price from Flare's FTSO oracle (falls back to a deterministic reference with no RPC). Used to value FXRP credit draws in USD.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: async (_a, econ) => jsonSafe(await flareSatellite(econ).xrpUsd()),
+  },
+  {
+    name: "cred402.flare_draw_fxrp",
+    description: "Draw working capital in the interoperable FAsset FXRP: Casper signs a USD-limited Credit Authorization Note, the Flare vault lends FXRP priced by FTSO, and KeeperHub executes the on-chain transaction (simulate → smart gas w/ backoff → private routing → audit).",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), amount_fxrp: num("FXRP to draw (whole FXRP)") }, required: ["agent_id", "amount_fxrp"] },
+    handler: async (a, econ) => {
+      const amount = fxrpSmallestUnits(a.amount_fxrp);
+      if (amount === null) return { error: "amount_fxrp must be a positive finite number" };
+      return jsonSafe(await flareSatellite(econ).draw(String(a.agent_id), amount));
+    },
+  },
+  {
+    name: "cred402.flare_repay_fxrp",
+    description: "Repay FXRP credit on the Flare satellite; the repayment is also executed through KeeperHub and released against the agent's Casper-rooted global exposure.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), amount_fxrp: num("FXRP to repay (whole FXRP)") }, required: ["agent_id", "amount_fxrp"] },
+    handler: async (a, econ) => {
+      const amount = fxrpSmallestUnits(a.amount_fxrp);
+      if (amount === null) return { error: "amount_fxrp must be a positive finite number" };
+      return jsonSafe(await flareSatellite(econ).repay(String(a.agent_id), amount));
+    },
+  },
+  {
+    name: "cred402.keeperhub_reliability",
+    description: "KeeperHub reliability summary for this session: executions, confirmations, private-routed + sponsored counts, average gas-backoff attempts, total gas, and settlement protocol (x402/MPP) breakdown.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(flareSatellite(econ).reliability()),
+  },
+  {
+    name: "cred402.keeperhub_audit",
+    description: "KeeperHub audit trail: per-execution record of trigger, simulation result, submitted transaction, gas used, payment rail, private routing, and outcome. Optionally filter by agent.",
+    inputSchema: { type: "object", properties: { agent_id: str("optional agent id filter") }, required: [] },
+    handler: (a, econ) => jsonSafe(flareSatellite(econ).auditTrail(a.agent_id ? String(a.agent_id) : undefined)),
+  },
+  {
+    name: "cred402.confidential_score",
+    description: "Score an agent's creditworthiness inside Flare Confidential Compute (TEE): the raw cash-flow features stay private in the enclave; only an attested score + input/model commitments are returned. Verifiable without revealing the inputs.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: async (a, econ) => {
+      const rs = new RiskEngineV2(econ.ledger).score(String(a.agent_id));
+      if ("error" in rs) return rs;
+      return jsonSafe(await confidentialScorer(econ).score(rs.agent_id, rs.features));
+    },
+  },
+  // ── FTSO position health + Autonomous Credit Keeper ───────────────────────
+  {
+    name: "cred402.flare_position",
+    description: "FTSO position health for an agent's FXRP debt: USD value marked to the live FTSO XRP/USD price, health factor vs the USD credit cap, price-risk drift, status, and the FXRP deleverage needed to cure a margin call. Pass price_usd to stress-test at a hypothetical XRP price.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), price_usd: num("optional what-if XRP/USD price") }, required: ["agent_id"] },
+    handler: async (a, econ) => {
+      const sat = flareSatellite(econ);
+      const engine = new PositionEngine(sat.vault, econ.ledger, sat.priceClient, {}, sat.collateral);
+      const priceOverride = a.price_usd !== undefined ? Number(a.price_usd) : undefined;
+      return jsonSafe(await engine.assess(String(a.agent_id), { priceOverride }));
+    },
+  },
+  {
+    name: "cred402.deposit_collateral",
+    description: "Post FTSO-priced collateral (USDC/BTC/ETH/XRP/FLR) to expand an agent's borrowing power. Each asset is marked to its live FTSO feed and discounted by an LTV haircut; the resulting borrowing power is added to the agent's reputation cap in its position health.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), symbol: str("USDC | BTC | ETH | XRP | FLR"), amount: num("whole units to deposit") }, required: ["agent_id", "symbol", "amount"] },
+    handler: async (a, econ) => {
+      if (!econ.ledger.agents.get(String(a.agent_id))) return { error: `unknown agent: ${a.agent_id}` };
+      const sat = flareSatellite(econ);
+      try {
+        const res = sat.collateral.deposit(String(a.agent_id), String(a.symbol), Number(a.amount));
+        return jsonSafe({ ...res, valuation: await sat.collateral.valueUsd(String(a.agent_id)) });
+      } catch (err) {
+        return { error: (err as Error).message };
+      }
+    },
+  },
+  {
+    name: "cred402.collateral_value",
+    description: "Value an agent's posted collateral basket in USD via FTSO, with per-asset LTV haircuts, plus the total borrowing power it contributes.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: async (a, econ) => jsonSafe(await flareSatellite(econ).collateral.valueUsd(String(a.agent_id))),
+  },
+  // ── FAssets: mint FXRP from attested XRP → collateralize ───────────────────
+  {
+    name: "cred402.mint_fxrp",
+    description: "Mint the FAsset FXRP from XRP: reserve minting, FDC-attest the XRPL payment, and execute minting 1:1. Set collateralize=true to immediately post the minted FXRP as FTSO-priced collateral, expanding the agent's borrowing power (bring XRP → borrow).",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), xrp: num("XRP to mint into FXRP"), collateralize: { type: "boolean", description: "post the minted FXRP as collateral" } }, required: ["agent_id", "xrp"] },
+    handler: async (a, econ) => {
+      const xrp = Number(a.xrp);
+      if (!Number.isFinite(xrp) || xrp <= 0) return { error: "xrp must be a positive finite number" };
+      const mint = await minter(econ).mint(String(a.agent_id), BigInt(Math.round(xrp * 1e6)));
+      if (a.collateralize) {
+        const sat = flareSatellite(econ);
+        sat.collateral.deposit(String(a.agent_id), "XRP", fxrpToXrp(BigInt(mint.fxrp_minted)));
+        minter(econ).debit(String(a.agent_id), BigInt(mint.fxrp_minted)); // FXRP moves wallet → collateral
+        return jsonSafe({ mint, valuation: await sat.collateral.valueUsd(String(a.agent_id)) });
+      }
+      return jsonSafe(mint);
+    },
+  },
+  {
+    name: "cred402.fassets_status",
+    description: "FAssets status for an agent: FXRP balance, minting reservations, circulating FXRP supply, and whether the real FDC attestation path is live.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: (a, econ) => {
+      const m = minter(econ);
+      return jsonSafe({ agent_id: String(a.agent_id), fxrp_balance: fxrpToXrp(m.balanceOf(String(a.agent_id))), reservations: m.reservationsFor(String(a.agent_id)), total_supply: fxrpToXrp(m.totalSupply()), fdc_live: m.liveFdc });
+    },
+  },
+  {
+    name: "cred402.redeem_fxrp",
+    description: "Redeem FXRP back to underlying XRP: burns FXRP and opens an XRPL redemption ticket.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id"), fxrp: num("FXRP to redeem") }, required: ["agent_id", "fxrp"] },
+    handler: (a, econ) => {
+      const fxrp = Number(a.fxrp);
+      if (!Number.isFinite(fxrp) || fxrp <= 0) return { error: "fxrp must be a positive finite number" };
+      try {
+        return jsonSafe(minter(econ).redeem(String(a.agent_id), BigInt(Math.round(fxrp * 1e6))));
+      } catch (err) {
+        return { error: (err as Error).message };
+      }
+    },
+  },
+  {
+    name: "cred402.keeper_evaluate",
+    description: "Autonomous Credit Keeper — evaluate ONLY (no execution): what protective action the keeper would take for an agent given its FTSO-priced position (deleverage on a margin call, else none), with the reason.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: async (a, econ) => jsonSafe(await new CreditKeeper(flareSatellite(econ), econ.ledger).evaluate(String(a.agent_id))),
+  },
+  {
+    name: "cred402.keeper_run",
+    description: "Autonomous Credit Keeper — check then EXECUTE: if the agent's FTSO position is in a margin call, autonomously deleverage it through KeeperHub (simulate → smart gas → private routing → audit). Only ever repays existing FXRP debt; safe to run unattended.",
+    inputSchema: { type: "object", properties: { agent_id: str("agent id") }, required: ["agent_id"] },
+    handler: async (a, econ) => jsonSafe(await new CreditKeeper(flareSatellite(econ), econ.ledger).run(String(a.agent_id))),
+  },
+  {
+    name: "cred402.keeper_run_fleet",
+    description: "Run the Autonomous Credit Keeper across every registered agent: per-agent decisions + executions and a rollup (evaluated, actioned, executed, total FXRP deleveraged, status breakdown).",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: async (_a, econ) => {
+      const ids = econ.ledger.agents.list().map((ag) => ag.agent_id);
+      return jsonSafe(await new CreditKeeper(flareSatellite(econ), econ.ledger).runFleet(ids));
+    },
+  },
+  // ── Credit Automations — declarative price/health/schedule credit rules ────
+  {
+    name: "cred402.create_automation",
+    description: "Create a set-and-forget credit automation: a trigger (price_below/price_above {price}, health_below {threshold}, or schedule {every_seconds}) → an action (deleverage {target_hf}, repay {amount_fxrp}, or notify). Registered as a KeeperHub workflow when a real key is set; executed reliably via KeeperHub on tick.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agent_id: str("agent id"),
+        name: str("automation name"),
+        trigger_kind: str("price_below | price_above | health_below | schedule"),
+        price: num("XRP/USD threshold (price_* triggers)"),
+        threshold: num("health-factor threshold (health_below)"),
+        every_seconds: num("interval seconds (schedule)"),
+        action_kind: str("deleverage | repay | notify"),
+        target_hf: num("target health factor (deleverage), default 2.0"),
+        amount_fxrp: num("FXRP to repay (repay action)"),
+      },
+      required: ["agent_id", "name", "trigger_kind", "action_kind"],
+    },
+    handler: async (a, econ) => {
+      const def = buildAutomationDef(a);
+      if ("error" in def) return def;
+      return jsonSafe(await automationEngine(econ).register(def));
+    },
+  },
+  {
+    name: "cred402.list_automations",
+    description: "List credit automations (optionally for one agent): trigger, action, enabled, fire count, last fired, and KeeperHub workflow id.",
+    inputSchema: { type: "object", properties: { agent_id: str("optional agent id filter") }, required: [] },
+    handler: (a, econ) => jsonSafe(automationEngine(econ).list(a.agent_id ? String(a.agent_id) : undefined)),
+  },
+  {
+    name: "cred402.tick_automations",
+    description: "Evaluate every enabled automation against the live FTSO price + position health and EXECUTE the ones whose trigger is due (deleverage/repay via KeeperHub). Returns one run record per fired automation.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: async (_a, econ) => jsonSafe(await automationEngine(econ).tick({ satellite: flareSatellite(econ), ledger: econ.ledger })),
+  },
+  {
+    name: "cred402.remove_automation",
+    description: "Delete a credit automation by id.",
+    inputSchema: { type: "object", properties: { id: str("automation id") }, required: ["id"] },
+    handler: (a, econ) => jsonSafe({ removed: automationEngine(econ).remove(String(a.id)) }),
+  },
+  // ── x402 Credit-Service Marketplace — pay-per-call credit intelligence ─────
+  {
+    name: "cred402.list_services",
+    description: "Discover Cred402's credit services sold over x402: credit checks, TEE-attested confidential scores, FTSO position health, ML risk scores, underwriting simulations — each with its per-call price, plus live call/revenue counters.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe({ services: marketplace(econ).listings(), stats: marketplace(econ).stats() }),
+  },
+  {
+    name: "cred402.buy_service",
+    description: "Buy a credit service over x402 end to end: fetch the 402 challenge, sign the PaymentAuthorization with a buyer agent's key, and receive the result + receipt. The paid receipt becomes Cred402's own on-chain revenue.",
+    inputSchema: {
+      type: "object",
+      properties: { service_id: str("credit-check | confidential-score | position-health | risk-score | underwrite"), agent_id: str("subject agent (for agent-scoped services)"), monthly_revenue_cspr: num("monthly revenue (underwrite only)") },
+      required: ["service_id"],
+    },
+    handler: async (a, econ) => {
+      const m = marketplace(econ);
+      const serviceId = String(a.service_id);
+      const params: Record<string, unknown> = {
+        agent_id: a.agent_id ? String(a.agent_id) : econ.seller.agent_id,
+        monthly_revenue_cspr: a.monthly_revenue_cspr ?? 120,
+      };
+      const challenged = await m.call(serviceId, undefined, params);
+      if (challenged.kind !== "challenge") return jsonSafe(challenged);
+      const challenge = (challenged.body as { challenge: Parameters<typeof signPayment>[0]["challenge"] }).challenge;
+      const { header } = signPayment({
+        challenge,
+        payer_agent: econ.buyer.agent_id,
+        payer_public_key: econ.buyer.publicKeyHex,
+        payer_private_pem: econ.buyer.keys.privatePem,
+      });
+      const paid = await m.call(serviceId, header, params);
+      return jsonSafe({ challenge, paid });
+    },
+  },
+  // ── Autonomous scheduler (KeeperHub cron) ──────────────────────────────────
+  {
+    name: "cred402.scheduler_status",
+    description: "Status of the autonomous scheduler: its jobs (keeper fleet sweep + automation tick), their intervals, whether it is running, and the recent run history. Models KeeperHub's scheduled-workflow/cron surface.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: (_a, econ) => jsonSafe(scheduler(econ).status()),
+  },
+  {
+    name: "cred402.scheduler_tick",
+    description: "Run one scheduler tick now: execute any due jobs (protective keeper deleverages across the fleet + due credit automations) through KeeperHub. Returns the runs that fired.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+    handler: async (_a, econ) => jsonSafe({ runs: await scheduler(econ).tick(), status: scheduler(econ).status() }),
+  },
 ];
+
+/** Build a validated AutomationDef from flat MCP tool arguments. */
+function buildAutomationDef(a: Record<string, unknown>): AutomationDef | { error: string } {
+  const triggerKind = String(a.trigger_kind);
+  let trigger: AutomationDef["trigger"];
+  if (triggerKind === "price_below" || triggerKind === "price_above") {
+    const price = Number(a.price);
+    if (!Number.isFinite(price) || price <= 0) return { error: `${triggerKind} requires a positive 'price'` };
+    trigger = { kind: triggerKind, price };
+  } else if (triggerKind === "health_below") {
+    const threshold = Number(a.threshold);
+    if (!Number.isFinite(threshold) || threshold <= 0) return { error: "health_below requires a positive 'threshold'" };
+    trigger = { kind: "health_below", threshold };
+  } else if (triggerKind === "schedule") {
+    const every = Number(a.every_seconds);
+    if (!Number.isFinite(every) || every < 1) return { error: "schedule requires 'every_seconds' >= 1" };
+    trigger = { kind: "schedule", every_seconds: every };
+  } else {
+    return { error: `unknown trigger_kind: ${triggerKind}` };
+  }
+
+  const actionKind = String(a.action_kind);
+  let action: AutomationDef["action"];
+  if (actionKind === "deleverage") {
+    action = { kind: "deleverage", target_hf: a.target_hf !== undefined ? Number(a.target_hf) : undefined };
+  } else if (actionKind === "repay") {
+    const amount = Number(a.amount_fxrp);
+    if (!Number.isFinite(amount) || amount <= 0) return { error: "repay requires a positive 'amount_fxrp'" };
+    action = { kind: "repay", amount_fxrp: amount };
+  } else if (actionKind === "notify") {
+    action = { kind: "notify" };
+  } else {
+    return { error: `unknown action_kind: ${actionKind}` };
+  }
+
+  return { agent_id: String(a.agent_id), name: String(a.name), trigger, action };
+}
 
 export const TOOL_INDEX = new Map(TOOLS.map((t) => [t.name, t]));

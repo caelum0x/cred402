@@ -9,6 +9,7 @@ import { CreditPool } from "./components/CreditPool";
 import { Disputes } from "./components/Disputes";
 import { Governance } from "./components/Governance";
 import { Multichain } from "./components/Multichain";
+import { Flare } from "./components/Flare";
 import { RealFi } from "./components/RealFi";
 import { Marketplace } from "./components/Marketplace";
 import { Analytics } from "./components/Analytics";
@@ -29,7 +30,7 @@ import { WalletButton } from "./components/WalletButton";
 import { EventFeed } from "./components/EventFeed";
 import { Controls } from "./components/Controls";
 
-const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
+const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "Flare", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
@@ -93,6 +94,7 @@ export function App() {
           {snapshot && tab === "Disputes" && <Disputes snapshot={snapshot} onChange={refresh} />}
           {snapshot && tab === "Governance" && <Governance snapshot={snapshot} onChange={refresh} />}
           {snapshot && tab === "Multichain" && <Multichain snapshot={snapshot} onChange={refresh} />}
+          {snapshot && tab === "Flare" && <Flare />}
           {snapshot && tab === "RealFi" && <RealFi snapshot={snapshot} onChange={refresh} />}
           {snapshot && tab === "Discovery" && <Discovery />}
           {snapshot && tab === "Network" && <Network />}

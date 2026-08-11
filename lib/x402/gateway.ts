@@ -86,6 +86,13 @@ export interface X402GatewayOptions {
   analytics?: GatewayAnalytics;
   /** Called with a receipt commitment on every verified payment (anchor it). */
   onReceipt?: (r: ReceiptCommitment) => void | Promise<void>;
+  /**
+   * Optional identity binding: assert the signing key actually belongs to the claimed
+   * `payer_agent` (return false to reject). Without this, a caller could sign with
+   * their own key yet claim another agent's identity in the receipt — corrupting any
+   * reputation/analytics keyed on payer_agent. Return true for unknown/anonymous payers.
+   */
+  authenticatePayer?: (payerAgent: string, payerPublicKey: string) => boolean;
   now?: () => number;
   /** id/nonce generator (override for deterministic tests). */
   randomId?: () => string;
@@ -163,6 +170,13 @@ export class X402Gateway {
       this.analytics.record(resource, "rejected");
       return { kind: "rejected", status: 402, body: { error: `payment rejected: ${check.reason}` } };
     }
+    // Identity binding: the signing key must belong to the claimed payer_agent, so a
+    // receipt (and any reputation keyed on it) cannot be attributed to a spoofed agent.
+    // Not consumed yet, so a caller can retry with a correct identity.
+    if (this.opts.authenticatePayer && !this.opts.authenticatePayer(proof.authorization.payer_agent, proof.payer_public_key)) {
+      this.analytics.record(resource, "rejected");
+      return { kind: "rejected", status: 403, body: { error: "payer identity does not match the signing key" } };
+    }
     // Consume: one-time challenge + nonce + proof.
     this.pending.delete(challenge.payment_id);
     this.nonces.remember(challenge.nonce);
@@ -173,7 +187,8 @@ export class X402Gateway {
       seller_agent: challenge.seller_agent,
       service_type: challenge.service_type,
       amount_motes: challenge.amount_motes,
-      resource,
+      // Bind the receipt to the CHALLENGE's resource, not the request-time arg.
+      resource: challenge.resource,
       payment_proof_hash: proofHash,
       nonce: challenge.nonce,
       created_at: this.now(),

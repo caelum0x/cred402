@@ -24,6 +24,20 @@ working capital. **RWA verification is the first wedge, not the whole product** 
 the same loop underwrites any agent that earns through x402. See the
 [roadmap](docs/roadmap/) for how Cred402 generalizes into the universal x402 credit layer.
 
+## 🏆 Hackathon submissions — KeeperHub × Flare
+
+Cred402's agents now **execute on-chain through KeeperHub** (the last mile) and use **Flare's**
+interoperable + confidential primitives (FXRP · FTSO · FDC · Confidential Compute). Nine features,
+one arc: earn → confidential score → FXRP credit via KeeperHub → FTSO position health → autonomous
+keeper → credit automations → multi-asset collateral → FAssets mint → x402 service marketplace →
+autonomous scheduler.
+
+- **Demo video:** [`media/cred402-hackathon-demo.mp4`](media/cred402-hackathon-demo.mp4) · regenerate with `npm run record:hackathon`
+- **Submission packets + readiness:** [`docs/SUBMISSIONS.md`](docs/SUBMISSIONS.md) · `npm run submit:check`
+- **Run the whole story:** `npm run demo:grand` · **Docs:** [KeeperHub](docs/keeperhub_integration.md) · [Flare](docs/flare_integration.md) · [keeper](docs/credit_keeper.md) · [automations](docs/credit_automations.md) · [collateral](docs/collateral.md) · [x402 marketplace](docs/x402_marketplace.md) · [FAssets](docs/fassets.md) · [scheduler](docs/scheduler.md)
+
+![Cred402 KeeperHub × Flare console](media/cred402-hackathon-poster.png)
+
 ## Live deployment
 
 | Surface | URL | Stack |
@@ -85,17 +99,19 @@ Build + deploy: `cd contracts && cargo odra build`, then the Odra livenet deploy
 
 ## What's real (not mocked)
 
-Cred402 ships real integrations behind environment flags — with sim / free-API fallbacks so the demo and the **151-test suite** run on any machine with no keys.
+Cred402 ships real integrations behind environment flags — with sim / free-API fallbacks so the demo and the **346-test suite** run on any machine with no keys.
 
 | Rail | Real integration |
 | ---- | ---------------- |
 | **Casper Testnet** | Byte-exact Casper 2.0 deploys + WASM install via `casper-js-sdk`; live node reads (`node.testnet.casper.network`). `CRED402_CHAIN=sim\|testnet`. |
-| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). |
+| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). A **Credit-Service Marketplace** sells Cred402's intelligence (credit checks, confidential scores, position health, risk scores, underwriting) pay-per-call over x402 (`/x402/services/:id`) — paid receipts become Cred402's own on-chain revenue. |
 | **RWA data** | Live solar GHI from **Open-Meteo** (free, no key) + a real PV physics model — never random mock data. |
-| **MCP** | 44-tool server over both a zero-dep stdio transport and the official `@modelcontextprotocol/sdk` (Claude Desktop / MCP Inspector). |
+| **MCP** | 78-tool server over both a zero-dep stdio transport and the official `@modelcontextprotocol/sdk` (Claude Desktop / MCP Inspector) — incl. the KeeperHub, Flare, keeper, automations, collateral, marketplace, FAssets + scheduler tools. |
 | **Event feed** | `casper-network/casper-sidecar` SSE `/events` client (faithful framing, contract-message extraction). |
 | **RealFi** | Real **Stripe** test-mode webhooks (HMAC-verified) + **Plaid** sandbox → privacy-preserving on-chain envelopes (zero PII on-chain). |
 | **Cross-chain** | EVM satellite compiles + deploys to **Base Sepolia** via Foundry; relayer anchors receipts back to Casper. |
+| **Flare** | **Flare** satellite lends the FAsset **FXRP** against a Casper CAN, priced by the live **FTSO** XRP/USD feed, with **FDC** attesting the cross-chain payment; **Confidential Compute** (TEE) scores agents privately. An **Autonomous Credit Keeper** marks each FXRP position to FTSO and auto-deleverages a margin call, and agents can post **FTSO-priced multi-asset collateral** (BTC/ETH/USDC/XRP/FLR, LTV-haircut) to expand borrowing power. Coston2-deployable (`contracts/flare/`). `FLARE_RPC_URL`. |
+| **KeeperHub** | Agents decide, **KeeperHub** executes: real KeeperHub **MCP** server (`app.keeperhub.com/mcp`) drives on-chain execution — preflight simulate → smart gas w/ backoff → private routing → audit trail, paid per-execution over **x402/MPP**. The keeper runs KeeperHub's **check → execute** pattern on live credit risk, **Credit Automations** register declarative price/health/schedule rules as KeeperHub workflows (cron), and an **Autonomous Scheduler** runs the keeper + automations unattended on a cadence. `KEEPERHUB_API_KEY`. |
 | **Wallet** | Real **Casper Wallet** extension connect + sign-in (challenge → ed25519 → session, `/v1/auth/wallet/*`). |
 
 All third-party code is documented in [`THIRD_PARTY.md`](THIRD_PARTY.md); the protocol logic is original.
@@ -122,7 +138,7 @@ npm run mcp:sdk                                  # official MCP server (Claude D
 npm run casper:sidecar                          # stream a live Casper Sidecar (set CRED402_SIDECAR_URL)
 
 # Quality gates:
-npm test                                        # 151 cases (p1–p10), node:test
+npm test                                        # 346 cases, node:test
 npm run typecheck
 ```
 

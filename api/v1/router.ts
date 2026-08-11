@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { ServerState } from "../state.js";
+import type { AutomationDef } from "../../lib/flare/automations.js";
 import {
   Gateway,
   ok,
@@ -178,6 +179,91 @@ export class V1Router {
       // Service-vertical underwriting profiles (p10)
       R("GET", "v1/verticals", "read", () => s.verticalProfiles()) ??
       R("GET", "v1/verticals/:vertical", "read", ({ params }) => required(s.verticals.get(params.vertical!), "vertical")) ??
+      // ── Flare satellite (interoperable FXRP credit) + KeeperHub execution ──
+      R("GET", "v1/flare", "read", () => s.flareInfo()) ??
+      R("GET", "v1/flare/price", "read", () => s.flareXrpPrice()) ??
+      R("POST", "v1/flare/draw", "write", ({ body }) => {
+        const b = parse(v.object({ agent_id: v.string({ min: 2, max: 64 }), amount_fxrp: v.number({ min: 0 }) }), body);
+        return s.flareDraw(b.agent_id, b.amount_fxrp);
+      }) ??
+      R("POST", "v1/flare/repay", "write", ({ body }) => {
+        const b = parse(v.object({ agent_id: v.string({ min: 2, max: 64 }), amount_fxrp: v.number({ min: 0 }) }), body);
+        return s.flareRepay(b.agent_id, b.amount_fxrp);
+      }) ??
+      // KeeperHub execution observability — reliability summary + full audit trail
+      R("GET", "v1/keeperhub/reliability", "read", () => s.keeperhubReliability()) ??
+      R("GET", "v1/keeperhub/audit", "read", ({ url }) => s.keeperhubAudit(url.searchParams.get("agent_id") ?? undefined)) ??
+      // Flare Confidential Compute credit score — attested, raw features stay private
+      R("GET", "v1/agents/:id/confidential-score", "read", ({ params }) => s.confidentialScore(params.id!)) ??
+      // FTSO position health + Autonomous Credit Keeper (check → execute via KeeperHub)
+      R("GET", "v1/agents/:id/position", "read", ({ params, url }) => s.flarePosition(params.id!, numParam(url, "price"))) ??
+      // FTSO-priced multi-asset collateral — expands borrowing power
+      R("GET", "v1/agents/:id/collateral", "read", ({ params }) => s.collateralValue(params.id!)) ??
+      R("POST", "v1/agents/:id/collateral", "write", ({ params, body }) => {
+        const b = parse(v.object({ symbol: v.string({ min: 2, max: 8 }), amount: v.number({ min: 0 }) }), body);
+        return s.depositCollateral(params.id!, b.symbol, b.amount);
+      }) ??
+      R("POST", "v1/agents/:id/collateral/withdraw", "write", ({ params, body }) => {
+        const b = parse(v.object({ symbol: v.string({ min: 2, max: 8 }), amount: v.number({ min: 0 }) }), body);
+        return s.withdrawCollateral(params.id!, b.symbol, b.amount);
+      }) ??
+      R("GET", "v1/keeper/evaluate/:id", "read", ({ params }) => s.keeperEvaluate(params.id!)) ??
+      R("POST", "v1/keeper/run", "write", ({ body }) => {
+        const b = parse(v.object({ agent_id: v.string({ min: 2, max: 64 }) }), body);
+        return s.keeperRun(b.agent_id);
+      }) ??
+      R("POST", "v1/keeper/run-fleet", "write", () => s.keeperRunFleet()) ??
+      // Credit Automations — declarative price/health/schedule credit rules
+      R("GET", "v1/automations", "read", ({ url }) => s.listAutomations(url.searchParams.get("agent_id") ?? undefined)) ??
+      R("POST", "v1/automations", "write", ({ body }) => {
+        const b = parse(
+          v.object({
+            agent_id: v.string({ min: 2, max: 64 }),
+            name: v.string({ min: 1, max: 64 }),
+            trigger: v.object({
+              kind: v.string({ min: 1, max: 32 }),
+              price: v.optional(v.number({ min: 0 })),
+              threshold: v.optional(v.number({ min: 0 })),
+              every_seconds: v.optional(v.number({ min: 1 })),
+            }),
+            action: v.object({
+              kind: v.string({ min: 1, max: 32 }),
+              target_hf: v.optional(v.number({ min: 0 })),
+              amount_fxrp: v.optional(v.number({ min: 0 })),
+            }),
+            cooldown_seconds: v.optional(v.number({ min: 0 })),
+          }),
+          body,
+        );
+        return s.createAutomation(b as unknown as AutomationDef);
+      }) ??
+      R("POST", "v1/automations/tick", "write", () => s.tickAutomations()) ??
+      R("POST", "v1/automations/:id/toggle", "write", ({ params, body }) => {
+        const b = parse(v.object({ enabled: v.boolean() }), body);
+        return s.toggleAutomation(params.id!, b.enabled);
+      }) ??
+      R("POST", "v1/automations/:id/remove", "write", ({ params }) => s.removeAutomation(params.id!)) ??
+      // x402 Credit-Service Marketplace discovery (buy at POST /x402/services/:id)
+      R("GET", "v1/services", "read", () => ({ services: s.listServices(), stats: s.serviceMarketStats() })) ??
+      R("GET", "v1/services/receipts", "read", () => s.marketplaceReceipts()) ??
+      // FAssets: mint FXRP from attested XRP, then collateralize
+      R("GET", "v1/agents/:id/fassets", "read", ({ params }) => s.fassetsStatus(params.id!)) ??
+      R("POST", "v1/fassets/mint", "write", ({ body }) => {
+        const b = parse(v.object({ agent_id: v.string({ min: 2, max: 64 }), xrp: v.number({ min: 0 }), collateralize: v.optional(v.boolean()) }), body);
+        return b.collateralize ? s.mintAndCollateralize(b.agent_id, b.xrp) : s.mintFxrp(b.agent_id, b.xrp);
+      }) ??
+      R("POST", "v1/fassets/redeem", "write", ({ body }) => {
+        const b = parse(v.object({ agent_id: v.string({ min: 2, max: 64 }), fxrp: v.number({ min: 0 }) }), body);
+        return s.redeemFxrp(b.agent_id, b.fxrp);
+      }) ??
+      // Autonomous scheduler (KeeperHub cron) — runs keeper + automations unattended
+      R("GET", "v1/scheduler", "read", () => s.schedulerStatus()) ??
+      R("POST", "v1/scheduler/tick", "write", () => s.schedulerTick()) ??
+      R("POST", "v1/scheduler/start", "write", ({ body }) => {
+        const b = parse(v.object({ interval_ms: v.optional(v.number({ min: 1000 })) }), body);
+        return s.schedulerStart(b.interval_ms);
+      }) ??
+      R("POST", "v1/scheduler/stop", "write", () => s.schedulerStop()) ??
       R("GET", "v1/credit/lp-preview", "read", ({ url }) => {
         const deposit = numParam(url, "deposit_cspr");
         if (deposit === undefined) throw new ApiError(400, "bad_request", "deposit_cspr query parameter required");

@@ -3,7 +3,7 @@ import type { UniversalReceiptEnvelope } from "../../../../crosschain/standards/
 import type { EvidenceAttestationEnvelope } from "../../../../crosschain/standards/evidence.js";
 import type { CreditAuthorizationNote } from "../../../../crosschain/standards/credit_notes.js";
 
-export type ChainFamily = "casper" | "evm" | "solana" | "cosmos" | "move" | "bitcoin";
+export type ChainFamily = "casper" | "evm" | "solana" | "cosmos" | "move" | "bitcoin" | "flare";
 
 export interface ChainCapabilities {
   smartContracts: boolean;
