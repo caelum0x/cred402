@@ -29,7 +29,7 @@ design to running code.
 | **MCP server** (`mcp/`) | AI agents | ✅ 54 tools — zero-dep stdio (`mcp/server.ts`) **and** official `@modelcontextprotocol/sdk` transport (`mcp/server_sdk.ts`, p9) for Claude Desktop / MCP Inspector |
 | **SDKs** | developers | ✅ TypeScript (`sdk/`), Python (`sdk/python/`), Go (`sdk/go/`), Rust (`sdk/rust/`) |
 | **CLIs** | developers / ops | ✅ `cred402` in TS (`cli/`), Go, Rust |
-| **x402 paid endpoints** | agent-to-agent commerce | ✅ real `402 → sign → 200` flow with **real EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional real `casper-x402` facilitator settlement (`api/paid_evidence_server`, `lib/x402`) |
+| **x402 paid endpoints** | agent-to-agent commerce | ✅ real `402 → sign → 200` flow with **real EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional real `casper-x402` facilitator settlement (`api/paid_evidence_server`, `lib/x402`); Algorand USDC credit-score endpoint with Bazaar discovery, non-cacheable paid responses, public readiness status and integrity-digested release evidence |
 | **Risk service API** | underwriting | ✅ Python risk-engine (`services/risk-engine/`) — PD model + fraud graph |
 
 ## 2. Protocol core (the canonical layer — Casper)

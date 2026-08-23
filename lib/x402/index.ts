@@ -4,3 +4,7 @@ export * from "./evm.js";
 export * from "./facilitator.js";
 export * from "./eip712.js";
 export * from "./gateway.js";
+export * from "./algorand_gateway.js";
+export * from "./algorand_client.js";
+export * from "./algorand_readiness.js";
+export * from "./algorand_release.js";

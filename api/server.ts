@@ -12,6 +12,14 @@ import { toCsv } from "../lib/services/csv.js";
 import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { renderCreditReportHtml } from "../lib/services/report_html.js";
 import type { CreditReport } from "../lib/services/credit_report.js";
+import {
+  AlgorandCreditScoreGateway,
+  ALGORAND_X402_STATUS_ROUTE,
+  algorandX402PrivateResponseHeaders,
+  createX402HttpContext,
+  describeAlgorandX402,
+  loadAlgorandX402Config,
+} from "../lib/x402/algorand_gateway.js";
 
 /**
  * Cred402 API server — zero external dependencies (node:http only).
@@ -27,15 +35,29 @@ import type { CreditReport } from "../lib/services/credit_report.js";
 const PORT = Number(process.env.PORT ?? process.env.CRED402_PORT ?? 4021);
 const FRONTEND_DIR = resolve(process.cwd(), "frontend", "dist");
 
-function json(res: ServerResponse, status: number, body: unknown): void {
+function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
   const payload = JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
   res.writeHead(status, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, X-Payment",
+    "Access-Control-Allow-Headers": "Content-Type, X-Payment, PAYMENT-SIGNATURE",
+    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    ...headers,
   });
   res.end(payload);
+}
+
+function sendInstructions(res: ServerResponse, instructions: { status: number; headers: Record<string, string>; body?: unknown }): void {
+  const body = typeof instructions.body === "string"
+    ? instructions.body
+    : JSON.stringify(instructions.body ?? {});
+  res.writeHead(instructions.status, {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
+    ...instructions.headers,
+  });
+  res.end(body);
 }
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
@@ -126,6 +148,10 @@ function csvRows(state: ReturnType<typeof getState>, resource: string): Array<Re
 
 const gateway = new Gateway(loadConfig());
 const v1 = new V1Router(gateway, getState());
+const algorandX402Config = loadAlgorandX402Config();
+const algorandCreditScore = algorandX402Config.enabled
+  ? new AlgorandCreditScoreGateway(algorandX402Config.config)
+  : undefined;
 
 // Fan protocol events out to registered webhook subscribers (HMAC-signed, retried).
 getState().ledger.bus.subscribe((e) => {
@@ -143,6 +169,119 @@ const server = createServer(async (req, res) => {
   }
 
   try {
+    // Free, secret-free deployment probe. It never initializes the facilitator.
+    if (pathname === ALGORAND_X402_STATUS_ROUTE && req.method === "GET") {
+      return json(res, 200, describeAlgorandX402(algorandX402Config), {
+        "Cache-Control": "no-store",
+      });
+    }
+
+    // ---- Algorand x402 v2 paid credit score (must run before the generic v1 router) ----
+    const algorandCreditMatch = pathname.match(/^\/v1\/x402\/credit-score\/([^/]+)$/);
+    if (algorandCreditMatch && req.method === "GET") {
+      const requestId = gateway.newRequestId();
+      const routeLabel = "GET /v1/x402/credit-score/:agentId";
+      const started = Date.now();
+      const responsePolicy = algorandX402PrivateResponseHeaders(requestId);
+      const log = gateway.log.child({
+        request_id: requestId,
+        method: req.method,
+        path: pathname,
+        ip: (req.socket.remoteAddress ?? "unknown").replace(/^::ffff:/, ""),
+      });
+      const respondJson = (
+        status: number,
+        body: unknown,
+        headers: Record<string, string> = {},
+      ) => {
+        gateway.recordHttp(routeLabel, status);
+        const fields = { status, ms: Date.now() - started };
+        if (status >= 500) log.error("Algorand x402 request failed", fields);
+        else if (status >= 400 && status !== 402) log.warn("Algorand x402 request rejected", fields);
+        else log.info(status === 402 ? "Algorand x402 payment required" : "Algorand x402 request settled", fields);
+        return json(res, status, body, { ...responsePolicy, ...headers });
+      };
+      const respondInstructions = (instructions: {
+        status: number;
+        headers: Record<string, string>;
+        body?: unknown;
+      }) => {
+        gateway.recordHttp(routeLabel, instructions.status);
+        const fields = { status: instructions.status, ms: Date.now() - started };
+        if (instructions.status >= 500) log.error("Algorand x402 request failed", fields);
+        else if (instructions.status === 402) log.info("Algorand x402 payment required", fields);
+        else log.warn("Algorand x402 payment rejected", fields);
+        return sendInstructions(res, {
+          ...instructions,
+          headers: { ...instructions.headers, ...responsePolicy },
+        });
+      };
+
+      const agentId = decodeURIComponent(algorandCreditMatch[1]!);
+      const report = state.x402CreditScore(agentId);
+      if ("error" in report) return respondJson(404, { error: "agent_not_found", message: report.error });
+      if (!algorandCreditScore || !algorandX402Config.enabled) {
+        return respondJson(503, {
+          error: "algorand_x402_not_configured",
+          message: algorandX402Config.enabled ? "Algorand x402 is unavailable" : algorandX402Config.reason,
+        });
+      }
+
+      const forwardedProto = typeof req.headers["x-forwarded-proto"] === "string" ? req.headers["x-forwarded-proto"] : undefined;
+      const forwardedHost = typeof req.headers["x-forwarded-host"] === "string" ? req.headers["x-forwarded-host"] : undefined;
+      const publicUrl = algorandX402Config.config.publicBaseUrl
+        ? `${algorandX402Config.config.publicBaseUrl}${url.pathname}${url.search}`
+        : `${forwardedProto ?? "http"}://${forwardedHost ?? req.headers.host ?? `localhost:${PORT}`}${url.pathname}${url.search}`;
+      const context = createX402HttpContext({
+        method: req.method,
+        path: pathname,
+        url: publicUrl,
+        headers: req.headers,
+        query: url.searchParams,
+      });
+
+      let authorization;
+      try {
+        authorization = await algorandCreditScore.authorize(context);
+      } catch (error) {
+        return respondJson(502, {
+          error: "x402_facilitator_unavailable",
+          message: error instanceof Error ? error.message : "Unable to initialize the Algorand facilitator",
+        });
+      }
+      if (authorization.type === "payment-error") return respondInstructions(authorization.response);
+      if (authorization.type !== "payment-verified") {
+        return respondJson(500, { error: "x402_route_misconfigured" });
+      }
+
+      const responseBody = Buffer.from(JSON.stringify(report));
+      let settlement;
+      try {
+        settlement = await algorandCreditScore.settle(authorization, context, responseBody);
+      } catch (error) {
+        // A facilitator timeout is an indeterminate settlement outcome: the
+        // on-chain transfer may already have completed. Do not attempt a second
+        // settlement or cancellation here; surface the uncertainty to the caller.
+        return respondJson(502, {
+          error: "x402_settlement_indeterminate",
+          message: error instanceof Error ? error.message : "Payment settlement failed",
+        });
+      }
+      if (!settlement.success) return respondInstructions(settlement.response);
+
+      return respondJson(200, {
+        ...report,
+        payment: {
+          protocol: "x402-v2",
+          network: settlement.network,
+          asset: algorandX402Config.config.usdcAsset,
+          amount_micro_usdc: settlement.amount ?? algorandX402Config.config.priceMicroUsdc,
+          payer: settlement.payer,
+          transaction: settlement.transaction,
+        },
+      }, settlement.headers);
+    }
+
     // ---- production versioned API (auth + rate limit + validation + envelope) ----
     if (pathname === "/v1" || pathname.startsWith("/v1/")) {
       if (await v1.handle(req, res, url)) return;

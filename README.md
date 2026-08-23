@@ -38,6 +38,24 @@ autonomous scheduler.
 
 ![Cred402 KeeperHub × Flare console](media/cred402-hackathon-poster.png)
 
+## Algorand Global x402 Challenge
+
+Cred402 exposes its credit oracle as a standards-compatible, Bazaar-discoverable
+Algorand x402 v2 resource:
+
+```text
+GET /v1/x402/credit-score/:agentId
+price: 0.01 USDC
+network: Algorand Testnet or Mainnet (environment-selected)
+tag: x402-global-challenge
+```
+
+The paid response combines the existing policy score, ML probability of default,
+eligibility and reason codes, verified x402 revenue, and underwriting provenance.
+Configure `CRED402_ALGORAND_PAY_TO` and the Algorand variables in
+[`.env.example`](.env.example); see [the integration guide](docs/algorand_x402.md)
+for Testnet and Mainnet rollout.
+
 ## Live deployment
 
 | Surface | URL | Stack |
@@ -104,7 +122,7 @@ Cred402 ships real integrations behind environment flags — with sim / free-API
 | Rail | Real integration |
 | ---- | ---------------- |
 | **Casper Testnet** | Byte-exact Casper 2.0 deploys + WASM install via `casper-js-sdk`; live node reads (`node.testnet.casper.network`). `CRED402_CHAIN=sim\|testnet`. |
-| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). A **Credit-Service Marketplace** sells Cred402's intelligence (credit checks, confidential scores, position health, risk scores, underwriting) pay-per-call over x402 (`/x402/services/:id`) — paid receipts become Cred402's own on-chain revenue. |
+| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). A **Credit-Service Marketplace** sells Cred402's intelligence pay-per-call over `/x402/services/:id`. The Algorand route `/v1/x402/credit-score/:agentId` uses official `@x402/core` + `@x402/avm`, GoPlausible settlement, USDC, and Bazaar discovery. |
 | **RWA data** | Live solar GHI from **Open-Meteo** (free, no key) + a real PV physics model — never random mock data. |
 | **MCP** | 78-tool server over both a zero-dep stdio transport and the official `@modelcontextprotocol/sdk` (Claude Desktop / MCP Inspector) — incl. the KeeperHub, Flare, keeper, automations, collateral, marketplace, FAssets + scheduler tools. |
 | **Event feed** | `casper-network/casper-sidecar` SSE `/events` client (faithful framing, contract-message extraction). |

@@ -287,6 +287,65 @@ export class ServerState {
   riskScoreV2(agentId: string) {
     return new RiskEngineV2(this.ledger).score(agentId);
   }
+  /**
+   * Paid, portable credit report for the Algorand x402 endpoint. This composes
+   * the existing underwriting oracle and risk engine rather than maintaining a
+   * second scoring model for the hackathon integration.
+   */
+  x402CreditScore(agentId: string) {
+    const credit = this.creditCheck(agentId);
+    const risk = this.riskScoreV2(agentId);
+    const agent = this.ledger.agents.get(agentId);
+    if (!credit.exists || !agent || "error" in risk) {
+      return { error: `unknown agent: ${agentId}` };
+    }
+
+    const now = this.ledger.clock.now();
+    const last30Days = agent.x402_revenue_history.filter((event) => event.timestamp >= now - 30 * 86400);
+    const sum = (events: typeof agent.x402_revenue_history) => events.reduce((total, event) => total + event.amount, 0n);
+    const reasonCodes = credit.risk_flags.length
+      ? credit.risk_flags.map((flag) => flag.toUpperCase())
+      : [credit.eligible ? "HEALTHY_CREDIT_PROFILE" : "NOT_CREDIT_ELIGIBLE"];
+
+    return {
+      schema_version: "cred402.credit-score.v1",
+      agent_id: agentId,
+      score: risk.blended_score,
+      risk_band: risk.risk_band,
+      probability_of_default: risk.pd,
+      eligible: credit.eligible,
+      reason_codes: reasonCodes,
+      credit: {
+        rules_score: risk.rules_score,
+        ml_score: risk.ml_score,
+        reputation_score: credit.reputation_score,
+        recommended_limit_motes: credit.recommended_limit_motes,
+        recommended_limit_cspr: formatCspr(BigInt(credit.recommended_limit_motes)),
+        interest_rate_bps: credit.interest_rate_bps,
+      },
+      verified_x402_revenue: {
+        currency: "CSPR",
+        all_time_motes: sum(agent.x402_revenue_history).toString(),
+        all_time_cspr: formatCspr(sum(agent.x402_revenue_history)),
+        last_30_days_motes: sum(last30Days).toString(),
+        last_30_days_cspr: formatCspr(sum(last30Days)),
+        receipt_count: agent.x402_revenue_history.length,
+      },
+      signals: {
+        service_type: agent.service_type,
+        jobs_completed: agent.total_jobs_completed,
+        accuracy_score: agent.accuracy_score,
+        dispute_rate: agent.dispute_rate,
+        stake_cspr: formatCspr(agent.stake),
+      },
+      provenance: {
+        source: "Cred402 Casper-rooted receipt ledger",
+        policy_version: credit.policy_version,
+        model: "risk-engine-v2",
+      },
+      as_of: new Date(now * 1000).toISOString(),
+    };
+  }
   /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
   dataCommons() {
     return new CreditDataCommons(this.ledger).snapshot();
