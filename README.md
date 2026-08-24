@@ -2,9 +2,9 @@
 
 <img src="frontend/public/cred402-mark.png" alt="Cred402" width="120" />
 
-# Cred402 — credit scores for autonomous AI agents on Casper
+# Cred402 — credit scores for autonomous AI agents, across every chain
 
-**Agents earn anywhere. Casper decides who is creditworthy.**
+**Agents earn on any chain. Cred402 decides who is creditworthy.**
 
 [**🌐 Live console**](https://cred402.vercel.app) · [**⚙️ Live API**](https://cred402-1.onrender.com/v1/health) · [**🎬 Demo video**](media/cred402-demo.mp4) · [**🗺️ Roadmap**](docs/roadmap/) · [Architecture](docs/architecture.md) · [Risk model](docs/risk_model.md) · [x402 flow](docs/x402_flow.md)
 
@@ -12,11 +12,14 @@
 
 ---
 
-> **Cred402 is the Casper-rooted credit & reputation protocol for the x402 economy.**
+> **Cred402 is the multi-chain credit & reputation protocol for the x402 economy —
+> an extension of x402 that spans blockchains, not a single-chain product.**
 > Every x402 payment is a verifiable machine-to-machine cash-flow event. Cred402
-> turns x402 receipts for **any** paid agent service — data, compute, inference,
-> storage, APIs, RWA verification — into on-chain reputation and DeFi credit, with
-> Casper as the canonical root of identity, reputation, receipts, and credit policy.
+> ingests x402 receipts from **any chain** — **Casper, Algorand, and EVM networks**
+> today, extensible to any x402-compatible chain — and turns them, for **any** paid
+> agent service (data, compute, inference, storage, APIs, RWA verification), into
+> on-chain reputation and DeFi credit. The payment and receipt layer is
+> chain-agnostic; Casper anchors the canonical identity, reputation, and credit-policy root.
 
 DeFi was built for wallets. Cred402 is built for **workers**: it turns agents from
 tools into financeable economic actors. Identity → payment rails → reputation →
@@ -54,7 +57,29 @@ The paid response combines the existing policy score, ML probability of default,
 eligibility and reason codes, verified x402 revenue, and underwriting provenance.
 Configure `CRED402_ALGORAND_PAY_TO` and the Algorand variables in
 [`.env.example`](.env.example); see [the integration guide](docs/algorand_x402.md)
-for Testnet and Mainnet rollout.
+for Testnet and Mainnet rollout. Copyable
+[TypeScript and Python consumers](examples/algorand-paid-score/) show the full
+`402 → approval → payment retry → settlement proof → finalized usage receipt`
+path against the public endpoint. The console's dedicated **Algorand x402** tab
+stays available when `/api/state` is unavailable, accepts any typed agent ID,
+and treats API agent IDs as suggestions. It reads
+[`/v1/x402/algorand/status`](https://cred402-1.onrender.com/v1/x402/algorand/status)
+and [`/v1/x402/algorand/usage`](https://cred402-1.onrender.com/v1/x402/algorand/usage)
+independently, with separate retries and a manual finalized-receipt refresh.
+The browser decodes the live `PAYMENT-REQUIRED` header and validates its version,
+single exact option, network, USDC ASA, receiver, price, resource URL, and tag.
+It does not read a private key or pay; the terminal consumers own approval,
+signing, retry, settlement, and proof verification.
+
+The paid route uses a durable exact-once attempt ledger: it stores a digest, not
+the raw `PAYMENT-SIGNATURE`, and replays the same paid response after safe retries
+or restarts. Facilitator success produces a provisional receipt; an independent
+Algorand Indexer check must match sender, receiver, ASA, amount, and the configured
+confirmation depth before revenue or reputation is finalized. Opaque attempt
+status and an operator refund-review queue cover timeout, mismatch, and sustained
+not-found outcomes. Mainnet also requires persistent storage, aligned runtime and
+network tiers, pinned HTTPS endpoints, and a deliberate real-USDC release
+acknowledgement.
 
 ## Live deployment
 
