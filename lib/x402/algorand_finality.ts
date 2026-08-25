@@ -40,7 +40,7 @@ export async function verifyAlgorandAssetTransfer(
     transaction: string;
     payer: string;
     receiver: string;
-    asset: number;
+    asset: string;
     amountMicroUsdc: string;
   },
 ): Promise<AlgorandFinalityResult> {
@@ -70,7 +70,7 @@ export async function verifyAlgorandAssetTransfer(
     const confirmedRound = integer(transaction?.["confirmed-round"]);
     const currentRound = integer(body["current-round"]);
     const amount = unsignedIntegerString(transfer?.amount);
-    const asset = integer(transfer?.["asset-id"]);
+    const asset = unsignedIntegerString(transfer?.["asset-id"]);
 
     if (transaction?.id !== expected.transaction) {
       return { status: "mismatch", reason: "Indexer transaction id does not match settlement" };

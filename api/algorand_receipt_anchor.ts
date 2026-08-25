@@ -27,7 +27,7 @@ export interface AlgorandCreditScoreSettlement {
   agentId: string;
   network: string;
   networkName: string;
-  usdcAsset: number;
+  usdcAsset: string;
   amountMicroUsdc: string;
   payer?: string;
   receiver: string;
@@ -138,7 +138,7 @@ export function challengeAlgorandExternalReceipt(ctx: AlgorandAnchorContext, rec
 }
 
 /** Public, aggregate-only usage proof for the Algorand challenge endpoint. */
-export function algorandX402Usage(ctx: AlgorandAnchorContext, network: string, usdcAsset: number) {
+export function algorandX402Usage(ctx: AlgorandAnchorContext, network: string, usdcAsset: string) {
   const asset = `algorand-asa:${usdcAsset}`;
   const byId = new Map(
     (ctx.externalReceiptProofs?.list() ?? []).map((receipt) => [receipt.receipt_id, receipt]),

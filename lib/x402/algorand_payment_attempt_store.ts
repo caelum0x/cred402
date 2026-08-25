@@ -23,7 +23,7 @@ export type AlgorandPaymentAttemptStatus =
 
 export interface StoredAlgorandSettlement {
   network: string;
-  asset: number;
+  asset: string;
   amountMicroUsdc: string;
   payer?: string;
   receiver: string;
@@ -278,8 +278,8 @@ export class AlgorandPaymentAttemptStore {
     const refundStatuses = ["not_required", "pending_reconciliation", "review_required", "completed"];
     const settlementValid = value?.status !== "settled" || (
       typeof value.settlement?.network === "string"
-      && typeof value.settlement.asset === "number"
-      && Number.isSafeInteger(value.settlement.asset)
+      && typeof value.settlement.asset === "string"
+      && /^\d+$/.test(value.settlement.asset)
       && /^\d+$/.test(value.settlement.amountMicroUsdc)
       && typeof value.settlement.receiver === "string"
       && typeof value.settlement.responseHeaders === "object"
