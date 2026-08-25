@@ -29,8 +29,9 @@ import { NotificationBell } from "./components/NotificationBell";
 import { WalletButton } from "./components/WalletButton";
 import { EventFeed } from "./components/EventFeed";
 import { Controls } from "./components/Controls";
+import { AlgorandX402Console } from "./components/AlgorandX402Console";
 
-const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "Flare", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
+const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Algorand x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "Flare", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
@@ -40,6 +41,8 @@ export function App() {
 
   const feedEvents = liveEvents.length ? liveEvents : (snapshot?.events ?? []).slice().reverse();
   const contractIndex = useMemo(() => indexContracts(manifest), [manifest]);
+  const independentTab = tab === "Algorand x402";
+  const singleColumn = tab === "On-Chain" || independentTab;
 
   return (
     <div className="app">
@@ -74,15 +77,20 @@ export function App() {
         ))}
       </nav>
 
-      <main className={tab === "On-Chain" ? "layout single" : "layout"}>
+      <main className={singleColumn ? "layout single" : "layout"}>
         <section className="content">
-          {!snapshot && <div className="empty">Loading on-chain state…</div>}
+          {!snapshot && !independentTab && <div className="empty">Loading on-chain state…</div>}
+          {tab === "Algorand x402" && (
+            <AlgorandX402Console agentIds={snapshot?.agents.map((agent) => agent.agent_id) ?? []} />
+          )}
           {snapshot && tab === "Analytics" && <Analytics />}
           {snapshot && tab === "On-Chain" && <OnChain manifest={manifest} events={feedEvents} connected={connected} />}
           {snapshot && tab === "Explorer" && <Explorer />}
           {snapshot && tab === "Developer" && <Developer />}
           {snapshot && tab === "Ops" && <Ops />}
-          {snapshot && tab === "x402" && <X402Playground />}
+          {snapshot && tab === "x402" && (
+            <X402Playground agentIds={snapshot.agents.map((agent) => agent.agent_id)} />
+          )}
           {snapshot && tab === "Onboard" && <Onboard />}
           {snapshot && tab === "Risk" && <Risk />}
           {snapshot && tab === "Bureau" && <Bureau />}
@@ -101,7 +109,7 @@ export function App() {
           {snapshot && tab === "Trust" && <Trust />}
           {snapshot && tab === "Compliance" && <Compliance />}
         </section>
-        {tab !== "On-Chain" && (
+        {!singleColumn && (
           <aside className="sidebar">
             <EventFeed events={feedEvents} connected={connected} contractIndex={contractIndex} />
           </aside>

@@ -1,7 +1,7 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import { resolve, extname, normalize } from "node:path";
+import { createServer } from "node:http";
+import { createHash } from "node:crypto";
 import { getState } from "./state.js";
+import { json, sendInstructions, readBody, readRawBody, serveStatic } from "./http_utils.js";
 import { handlePaidEvidence } from "./paid_evidence_server/index.js";
 import { Gateway, loadConfig, toApiError } from "../lib/gateway/index.js";
 import { V1Router } from "./v1/router.js";
@@ -12,6 +12,8 @@ import { toCsv } from "../lib/services/csv.js";
 import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { renderCreditReportHtml } from "../lib/services/report_html.js";
 import type { CreditReport } from "../lib/services/credit_report.js";
+import { hashObject } from "../lib/core/hash.js";
+import { verifyUniversalReceipt } from "../crosschain/standards/receipts.js";
 import {
   AlgorandCreditScoreGateway,
   ALGORAND_X402_STATUS_ROUTE,
@@ -20,6 +22,7 @@ import {
   describeAlgorandX402,
   loadAlgorandX402Config,
 } from "../lib/x402/algorand_gateway.js";
+import { verifyAlgorandAssetTransfer } from "../lib/x402/algorand_finality.js";
 
 /**
  * Cred402 API server — zero external dependencies (node:http only).
@@ -33,71 +36,6 @@ import {
  */
 // Honor the platform-provided PORT (Render/Heroku/etc.), then CRED402_PORT, then default.
 const PORT = Number(process.env.PORT ?? process.env.CRED402_PORT ?? 4021);
-const FRONTEND_DIR = resolve(process.cwd(), "frontend", "dist");
-
-function json(res: ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}): void {
-  const payload = JSON.stringify(body, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, X-Payment, PAYMENT-SIGNATURE",
-    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    ...headers,
-  });
-  res.end(payload);
-}
-
-function sendInstructions(res: ServerResponse, instructions: { status: number; headers: Record<string, string>; body?: unknown }): void {
-  const body = typeof instructions.body === "string"
-    ? instructions.body
-    : JSON.stringify(instructions.body ?? {});
-  res.writeHead(instructions.status, {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
-    ...instructions.headers,
-  });
-  res.end(body);
-}
-
-async function readBody(req: IncomingMessage): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return raw ? JSON.parse(raw) : {};
-}
-
-/** Raw request body — required for Stripe webhook HMAC signature verification. */
-async function readRawBody(req: IncomingMessage): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const c of req) chunks.push(c as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
-}
-
-const MIME: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".ico": "image/x-icon",
-};
-
-async function serveStatic(res: ServerResponse, pathname: string): Promise<boolean> {
-  try {
-    let rel = pathname === "/" ? "/index.html" : pathname;
-    const filePath = normalize(resolve(FRONTEND_DIR, "." + rel));
-    if (!filePath.startsWith(FRONTEND_DIR)) return false; // path traversal guard
-    const s = await stat(filePath).catch(() => null);
-    const target = s?.isFile() ? filePath : resolve(FRONTEND_DIR, "index.html"); // SPA fallback
-    const data = await readFile(target);
-    res.writeHead(200, { "Content-Type": MIME[extname(target)] ?? "application/octet-stream" });
-    res.end(data);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /** Flatten a read model into CSV-ready rows for the export endpoints. */
 function csvRows(state: ReturnType<typeof getState>, resource: string): Array<Record<string, unknown>> | null {
@@ -153,6 +91,102 @@ const algorandCreditScore = algorandX402Config.enabled
   ? new AlgorandCreditScoreGateway(algorandX402Config.config)
   : undefined;
 
+async function reconcileAlgorandPayment(
+  state: ReturnType<typeof getState>,
+  paymentProofHash: string,
+) {
+  const attempt = state.algorandPaymentAttempts.getByProofHash(paymentProofHash);
+  if (!attempt?.settlement || !algorandX402Config.enabled) return attempt;
+  if (attempt.finality?.status === "confirmed" || attempt.finality?.status === "mismatch") return attempt;
+  if (
+    attempt.finality?.checkedAt &&
+    Date.now() - Date.parse(attempt.finality.checkedAt) < algorandX402Config.config.reconciliationIntervalMs
+  ) return attempt;
+
+  const { settlement } = attempt;
+  if (!settlement.transaction || !settlement.payer) {
+    state.algorandPaymentAttempts.recordFinality(paymentProofHash, {
+      status: "mismatch",
+      reason: "facilitator settlement omitted transaction or payer",
+    });
+    if (settlement.externalReceiptId) {
+      state.challengeAlgorandExternalReceipt(settlement.externalReceiptId);
+    }
+    return state.algorandPaymentAttempts.requireRefundReview(
+      paymentProofHash,
+      "Settlement cannot be independently verified because transaction identity is incomplete",
+      settlement.transaction,
+    );
+  }
+
+  const result = await verifyAlgorandAssetTransfer({
+    indexerUrl: algorandX402Config.config.indexerUrl,
+    indexerToken: algorandX402Config.config.indexerToken,
+    timeoutMs: algorandX402Config.config.indexerTimeoutMs,
+    minimumRounds: algorandX402Config.config.minimumFinalityRounds,
+  }, {
+    transaction: settlement.transaction,
+    payer: settlement.payer,
+    receiver: settlement.receiver,
+    asset: settlement.asset,
+    amountMicroUsdc: settlement.amountMicroUsdc,
+  });
+  let updated = state.algorandPaymentAttempts.recordFinality(paymentProofHash, {
+    ...result,
+  });
+
+  if (result.status === "confirmed" && settlement.externalReceiptId) {
+    state.finalizeAlgorandExternalReceipt(settlement.externalReceiptId);
+  } else if (
+    result.status === "mismatch" ||
+    (result.status === "not_found" &&
+      (updated.finality?.consecutiveMisses ?? 0) >= algorandX402Config.config.missingTransactionThreshold &&
+      Date.now() - Date.parse(updated.createdAt) >= algorandX402Config.config.missingTransactionGraceMs)
+  ) {
+    if (settlement.externalReceiptId) {
+      state.challengeAlgorandExternalReceipt(settlement.externalReceiptId);
+    }
+    updated = state.algorandPaymentAttempts.requireRefundReview(
+      paymentProofHash,
+      result.status === "mismatch"
+        ? result.reason
+        : "Transaction remained absent from the configured Indexer across reconciliation checks",
+      settlement.transaction,
+    );
+  }
+  return updated;
+}
+
+if (algorandX402Config.enabled) {
+  let reconciliationRunning = false;
+  const timer = setInterval(async () => {
+    if (reconciliationRunning) return;
+    reconciliationRunning = true;
+    try {
+      const pending = getState().algorandPaymentAttempts.list()
+        .filter((attempt) =>
+          attempt.status === "settled" &&
+          attempt.finality?.status !== "confirmed" &&
+          attempt.finality?.status !== "mismatch",
+        )
+        .slice(0, 100);
+      for (const attempt of pending) {
+        try {
+          await reconcileAlgorandPayment(getState(), attempt.paymentProofHash);
+        } catch (error) {
+          gateway.log.warn("Algorand payment reconciliation failed", {
+            attempt_id: attempt.attemptId,
+            error: error instanceof Error ? error.message : "unknown reconciliation error",
+          });
+        }
+      }
+    } finally {
+      reconciliationRunning = false;
+    }
+  }, algorandX402Config.config.reconciliationIntervalMs);
+  timer.unref();
+}
+
 // Fan protocol events out to registered webhook subscribers (HMAC-signed, retried).
 getState().ledger.bus.subscribe((e) => {
   void gateway.webhooks.dispatch(e.name, { seq: e.seq, contract: e.contract, deploy_hash: e.deploy_hash, ...e.data });
@@ -169,11 +203,118 @@ const server = createServer(async (req, res) => {
   }
 
   try {
+    if (pathname.startsWith("/api/demo/") && loadConfig().env !== "development") {
+      return json(res, 404, { error: "not_found" }, { "Cache-Control": "no-store" });
+    }
+
     // Free, secret-free deployment probe. It never initializes the facilitator.
     if (pathname === ALGORAND_X402_STATUS_ROUTE && req.method === "GET") {
       return json(res, 200, describeAlgorandX402(algorandX402Config), {
         "Cache-Control": "no-store",
       });
+    }
+
+    if (pathname === "/v1/x402/algorand/usage" && req.method === "GET") {
+      if (!algorandX402Config.enabled) {
+        return json(res, 503, {
+          error: "algorand_x402_not_configured",
+          message: algorandX402Config.reason,
+        }, { "Cache-Control": "no-store" });
+      }
+      const usage = state.algorandX402Usage(
+        algorandX402Config.config.network,
+        algorandX402Config.config.usdcAsset,
+      );
+      const origin = algorandX402Config.config.publicBaseUrl ?? `http://${req.headers.host ?? `localhost:${PORT}`}`;
+      return json(res, 200, {
+        ...usage,
+        latest_receipts: usage.latest_receipts.map((receipt) => ({
+          ...receipt,
+          proof_url: new URL(
+            `/v1/x402/external-receipts/${encodeURIComponent(receipt.receipt_id)}`,
+            origin,
+          ).href,
+        })),
+      }, { "Cache-Control": "public, max-age=30" });
+    }
+
+    const algorandAttemptMatch = pathname.match(/^\/v1\/x402\/algorand\/payments\/(pay_[0-9a-f]{32})$/);
+    if (algorandAttemptMatch && req.method === "GET") {
+      const attempt = state.algorandPaymentAttempts.getByAttemptId(algorandAttemptMatch[1]!);
+      if (!attempt) {
+        return json(res, 404, { error: "payment_attempt_not_found" }, { "Cache-Control": "no-store" });
+      }
+      const reconciled = attempt.status === "settled"
+        ? await reconcileAlgorandPayment(state, attempt.paymentProofHash)
+        : attempt;
+      const origin = algorandX402Config.enabled
+        ? algorandX402Config.config.publicBaseUrl ?? `http://${req.headers.host ?? `localhost:${PORT}`}`
+        : `http://${req.headers.host ?? `localhost:${PORT}`}`;
+      const receiptId = reconciled?.settlement?.externalReceiptId;
+      return json(res, 200, {
+        schema_version: "cred402.algorand-payment-attempt.v1",
+        attempt_id: reconciled?.attemptId,
+        status: reconciled?.status,
+        finality: reconciled?.finality
+          ? {
+              status: reconciled.finality.status,
+              checked_at: reconciled.finality.checkedAt,
+              confirmations: reconciled.finality.confirmations,
+              minimum_rounds: algorandX402Config.enabled
+                ? algorandX402Config.config.minimumFinalityRounds
+                : undefined,
+            }
+          : null,
+        refund: {
+          status: reconciled?.refund.status,
+          updated_at: reconciled?.refund.updatedAt,
+        },
+        transaction: reconciled?.settlement?.transaction ?? null,
+        external_receipt_url: receiptId
+          ? new URL(`/v1/x402/external-receipts/${encodeURIComponent(receiptId)}`, origin).href
+          : null,
+        guidance: reconciled?.status === "indeterminate"
+          ? "Do not submit another payment. Reconciliation is required."
+          : undefined,
+      }, { "Cache-Control": "private, no-store, max-age=0" });
+    }
+
+    // Public proof for a settled cross-chain x402 receipt. Receipt ids are
+    // content hashes of the canonical envelope, so callers can independently
+    // verify integrity without an API key or access to the paid report itself.
+    const externalReceiptMatch = pathname.match(/^\/v1\/x402\/external-receipts\/([^/]+)$/);
+    if (externalReceiptMatch && req.method === "GET") {
+      const receiptId = decodeURIComponent(externalReceiptMatch[1]!);
+      const receipt = state.externalReceiptProof(receiptId);
+      if (!receipt) {
+        return json(res, 404, {
+          error: "receipt_not_found",
+          message: "External x402 receipt not found",
+        }, { "Cache-Control": "no-store" });
+      }
+      const integrity = verifyUniversalReceipt(receipt.envelope, receipt.receipt_id);
+      return json(res, 200, {
+        schema_version: "cred402.external-receipt-proof.v1",
+        receipt_id: receipt.receipt_id,
+        integrity,
+        anchor: {
+          ledger: "casper",
+          status: receipt.status,
+          anchored_at: receipt.anchored_at,
+        },
+        settlement: {
+          origin_chain: receipt.origin_chain,
+          network: receipt.settlement_network,
+          transaction: receipt.settlement_tx_hash,
+          asset: receipt.asset,
+          amount: receipt.amount,
+        },
+        parties: {
+          payer_agent_id: receipt.payer_agent_id,
+          seller_agent_id: receipt.seller_agent_id,
+        },
+        envelope: receipt.envelope,
+      }, { "Cache-Control": "public, max-age=60" });
     }
 
     // ---- Algorand x402 v2 paid credit score (must run before the generic v1 router) ----
@@ -239,6 +380,47 @@ const server = createServer(async (req, res) => {
         headers: req.headers,
         query: url.searchParams,
       });
+      const paymentSignature = context.paymentHeader;
+      const paymentProofHash = paymentSignature
+        ? createHash("sha256").update(paymentSignature, "utf8").digest("hex")
+        : undefined;
+      const requestHash = hashObject({ method: req.method, url: publicUrl, agent_id: agentId }).slice(2);
+      const paymentAttemptUrl = (attemptId: string) => new URL(
+        `/v1/x402/algorand/payments/${attemptId}`,
+        publicUrl,
+      ).href;
+      const replay = (proofHash: string) => {
+        const existing = state.algorandPaymentAttempts.getByProofHash(proofHash);
+        if (!existing) return false;
+        if (existing.requestHash !== requestHash) {
+          respondJson(409, {
+            error: "x402_payment_replay_conflict",
+            message: "This payment proof is already bound to a different resource request",
+            payment_attempt_url: paymentAttemptUrl(existing.attemptId),
+          });
+          return true;
+        }
+        if (existing.status === "settled" && existing.settlement) {
+          respondJson(200, existing.settlement.resourceResponse, existing.settlement.responseHeaders);
+          return true;
+        }
+        if (existing.status === "failed") {
+          respondJson(409, {
+            error: existing.errorCode ?? "x402_settlement_failed",
+            message: "This payment proof was already rejected and will not be retried",
+            payment_attempt_url: paymentAttemptUrl(existing.attemptId),
+          });
+          return true;
+        }
+        respondJson(202, {
+          error: existing.errorCode ?? "x402_settlement_in_progress",
+          message: "Do not submit another payment while this attempt is being reconciled",
+          attempt_id: existing.attemptId,
+          payment_attempt_url: paymentAttemptUrl(existing.attemptId),
+        }, { "Retry-After": "5" });
+        return true;
+      };
+      if (paymentProofHash && replay(paymentProofHash)) return;
 
       let authorization;
       try {
@@ -253,6 +435,18 @@ const server = createServer(async (req, res) => {
       if (authorization.type !== "payment-verified") {
         return respondJson(500, { error: "x402_route_misconfigured" });
       }
+      if (!paymentProofHash) {
+        return respondJson(400, { error: "x402_payment_signature_missing" });
+      }
+      const claim = state.algorandPaymentAttempts.claim({
+        paymentProofHash,
+        requestHash,
+        requestId,
+      });
+      if (!claim.created) {
+        replay(paymentProofHash);
+        return;
+      }
 
       const responseBody = Buffer.from(JSON.stringify(report));
       let settlement;
@@ -262,24 +456,98 @@ const server = createServer(async (req, res) => {
         // A facilitator timeout is an indeterminate settlement outcome: the
         // on-chain transfer may already have completed. Do not attempt a second
         // settlement or cancellation here; surface the uncertainty to the caller.
+        const attempt = state.algorandPaymentAttempts.markIndeterminate(paymentProofHash);
         return respondJson(502, {
           error: "x402_settlement_indeterminate",
-          message: error instanceof Error ? error.message : "Payment settlement failed",
-        });
+          message: "Settlement outcome is unknown. Do not pay again; use the attempt URL for reconciliation.",
+          attempt_id: attempt.attemptId,
+          payment_attempt_url: paymentAttemptUrl(attempt.attemptId),
+        }, { "Retry-After": "5" });
       }
-      if (!settlement.success) return respondInstructions(settlement.response);
+      if (!settlement.success) {
+        state.algorandPaymentAttempts.markFailed(paymentProofHash, "x402_settlement_rejected");
+        return respondInstructions(settlement.response);
+      }
 
-      return respondJson(200, {
+      const amountMicroUsdc = settlement.amount ?? algorandX402Config.config.priceMicroUsdc;
+      const basePayment = {
+        protocol: "x402-v2",
+        network: settlement.network,
+        asset: algorandX402Config.config.usdcAsset,
+        amount_micro_usdc: amountMicroUsdc,
+        payer: settlement.payer,
+        transaction: settlement.transaction,
+        external_receipt_id: null,
+        external_receipt_url: null,
+        payment_attempt_url: paymentAttemptUrl(claim.attempt.attemptId),
+        algorand_finality: "pending",
+        casper_anchor_status: "not_recorded",
+      };
+      state.algorandPaymentAttempts.settle(paymentProofHash, {
+        network: settlement.network,
+        asset: algorandX402Config.config.usdcAsset,
+        amountMicroUsdc,
+        payer: settlement.payer,
+        receiver: algorandX402Config.config.payTo,
+        transaction: settlement.transaction,
+        responseHeaders: settlement.headers,
+        resourceResponse: { ...report, payment: basePayment },
+      });
+      const anchoredReceipt = state.anchorAlgorandCreditScoreSettlement({
+        agentId,
+        network: settlement.network,
+        networkName: algorandX402Config.config.networkName,
+        usdcAsset: algorandX402Config.config.usdcAsset,
+        amountMicroUsdc,
+        payer: settlement.payer,
+        receiver: algorandX402Config.config.payTo,
+        transaction: settlement.transaction,
+        report,
+      });
+      const externalReceiptUrl = anchoredReceipt
+        ? new URL(
+            `/v1/x402/external-receipts/${encodeURIComponent(anchoredReceipt.receipt_id)}`,
+            publicUrl,
+          ).href
+        : null;
+      state.algorandPaymentAttempts.settle(paymentProofHash, {
+        network: settlement.network,
+        asset: algorandX402Config.config.usdcAsset,
+        amountMicroUsdc,
+        payer: settlement.payer,
+        receiver: algorandX402Config.config.payTo,
+        transaction: settlement.transaction,
+        externalReceiptId: anchoredReceipt?.receipt_id,
+        responseHeaders: settlement.headers,
+        resourceResponse: { ...report, payment: basePayment },
+      });
+      const reconciled = await reconcileAlgorandPayment(state, paymentProofHash);
+      const receiptStatus = anchoredReceipt
+        ? state.externalReceiptProof(anchoredReceipt.receipt_id)?.status ?? "anchored"
+        : "not_recorded";
+      const response = {
         ...report,
         payment: {
-          protocol: "x402-v2",
-          network: settlement.network,
-          asset: algorandX402Config.config.usdcAsset,
-          amount_micro_usdc: settlement.amount ?? algorandX402Config.config.priceMicroUsdc,
-          payer: settlement.payer,
-          transaction: settlement.transaction,
+          ...basePayment,
+          external_receipt_id: anchoredReceipt?.receipt_id ?? null,
+          external_receipt_url: externalReceiptUrl,
+          algorand_finality: reconciled?.finality?.status ?? "unavailable",
+          confirmations: reconciled?.finality?.confirmations ?? null,
+          casper_anchor_status: receiptStatus,
         },
-      }, settlement.headers);
+      };
+      state.algorandPaymentAttempts.settle(paymentProofHash, {
+        network: settlement.network,
+        asset: algorandX402Config.config.usdcAsset,
+        amountMicroUsdc,
+        payer: settlement.payer,
+        receiver: algorandX402Config.config.payTo,
+        transaction: settlement.transaction,
+        externalReceiptId: anchoredReceipt?.receipt_id,
+        responseHeaders: settlement.headers,
+        resourceResponse: response,
+      });
+      return respondJson(200, response, settlement.headers);
     }
 
     // ---- production versioned API (auth + rate limit + validation + envelope) ----

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { x402Buy, fmtCspr, type X402Trace } from "../api";
+import { AlgorandX402Console } from "./AlgorandX402Console";
 
 interface ServiceListing {
   id: string;
@@ -88,7 +89,7 @@ function ServiceMarket() {
  */
 const TYPES = ["energy_output", "weather_risk", "receivable_quality"];
 
-export function X402Playground() {
+export function X402Playground({ agentIds }: { agentIds: readonly string[] }) {
   const [type, setType] = useState(TYPES[0]!);
   const [tampered, setTampered] = useState(false);
   const [trace, setTrace] = useState<X402Trace | null>(null);
@@ -105,6 +106,8 @@ export function X402Playground() {
 
   return (
     <div className="pool">
+      <AlgorandX402Console agentIds={agentIds} />
+
       <div className="card wide">
         <h3>x402 payment flow</h3>
         <div className="controls">

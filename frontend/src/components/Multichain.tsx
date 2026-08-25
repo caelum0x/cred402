@@ -55,9 +55,9 @@ export function Multichain({ snapshot, onChange }: { snapshot: Snapshot; onChang
       <div className="card wide">
         <h3>External receipts anchored to Casper</h3>
         <table className="table">
-          <thead><tr><th>Origin</th><th>Seller</th><th>Amount</th><th>Service</th><th>Status</th></tr></thead>
+          <thead><tr><th>Origin</th><th>Seller</th><th>Amount</th><th>Service</th><th>Status</th><th>Proof</th></tr></thead>
           <tbody>
-            {ext.length === 0 && <tr><td colSpan={5} className="muted">No external receipts.</td></tr>}
+            {ext.length === 0 && <tr><td colSpan={6} className="muted">No external receipts.</td></tr>}
             {ext.map((r) => (
               <tr key={r.receipt_id}>
                 <td><span className="chip">{r.origin_chain}</span></td>
@@ -65,6 +65,17 @@ export function Multichain({ snapshot, onChange }: { snapshot: Snapshot; onChang
                 <td>{r.amount} {r.asset}</td>
                 <td className="muted">{r.service_type}</td>
                 <td><span className="chip ok">{r.status}</span></td>
+                <td>
+                  <a
+                    className="tab"
+                    href={`/v1/x402/external-receipts/${encodeURIComponent(r.receipt_id)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`Verify settlement ${r.settlement_tx_hash}`}
+                  >
+                    verify
+                  </a>
+                </td>
               </tr>
             ))}
           </tbody>

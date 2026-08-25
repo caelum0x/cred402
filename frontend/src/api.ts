@@ -231,6 +231,106 @@ export async function x402Buy(evidenceType: string, tampered = false): Promise<X
   return res.json();
 }
 
+export interface AlgorandX402Status {
+  schema_version: "cred402.algorand-x402-status.v1";
+  configured: boolean;
+  protocol: "x402-v2";
+  paid_route: "/v1/x402/credit-score/:agentId";
+  network?: string;
+  network_name?: "testnet" | "mainnet";
+  usdc_asset?: number;
+  price_micro_usdc?: string;
+  pay_to?: string;
+  facilitator_url?: string;
+  public_origin?: string;
+  release_tier?: "development" | "testnet" | "mainnet";
+  finality?: {
+    indexer_url: string;
+    minimum_rounds: number;
+    missing_transaction_threshold: number;
+    reconciliation_interval_ms: number;
+    missing_transaction_grace_ms: number;
+  };
+  discovery: {
+    bazaar: true;
+    challenge_tag: "x402-global-challenge";
+  };
+  reason?: string;
+}
+
+export interface AlgorandChallengeProbe {
+  agent_id: string;
+  endpoint: string;
+  status: number;
+  payment_required: boolean;
+  payment_required_header: string | null;
+  request_id: string | null;
+  body: unknown;
+}
+
+export interface AlgorandX402Usage {
+  schema_version: "cred402.algorand-x402-usage.v1";
+  network: string;
+  usdc_asset: number;
+  paid_requests: number;
+  unique_payers: number;
+  total_micro_usdc: string;
+  latest_payment_at: string | null;
+  latest_receipts: Array<{
+    receipt_id: string;
+    transaction: string;
+    amount_micro_usdc: string;
+    anchored_at: string;
+    proof_url: string;
+  }>;
+}
+
+export async function getAlgorandX402Status(): Promise<AlgorandX402Status> {
+  const res = await fetch("/v1/x402/algorand/status", {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`Algorand x402 status failed: HTTP ${res.status}`);
+  return res.json() as Promise<AlgorandX402Status>;
+}
+
+export async function getAlgorandX402Usage(): Promise<AlgorandX402Usage> {
+  const res = await fetch("/v1/x402/algorand/usage", {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`Algorand x402 usage failed: HTTP ${res.status}`);
+  return res.json() as Promise<AlgorandX402Usage>;
+}
+
+export async function probeAlgorandCreditScore(
+  agentId: string,
+): Promise<AlgorandChallengeProbe> {
+  const cleanId = agentId.trim();
+  if (!cleanId) throw new Error("Enter an agent ID before requesting a challenge.");
+  const endpoint = `/v1/x402/credit-score/${encodeURIComponent(cleanId)}`;
+  const res = await fetch(endpoint, {
+    headers: { Accept: "application/json" },
+    redirect: "error",
+  });
+  const text = await res.text();
+  let body: unknown = text;
+  if (text) {
+    try {
+      body = JSON.parse(text) as unknown;
+    } catch {
+      // Keep non-JSON provider errors visible to the operator.
+    }
+  }
+  return {
+    agent_id: cleanId,
+    endpoint,
+    status: res.status,
+    payment_required: Boolean(res.headers.get("PAYMENT-REQUIRED")),
+    payment_required_header: res.headers.get("PAYMENT-REQUIRED"),
+    request_id: res.headers.get("X-Request-Id"),
+    body,
+  };
+}
+
 export async function pauseProtocol(area: "credit_draws" | "registrations" | "receipt_finalization", on: boolean): Promise<void> {
   await fetch("/api/governance/pause", {
     method: "POST",

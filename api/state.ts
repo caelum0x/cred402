@@ -68,6 +68,8 @@ import { AutonomousScheduler } from "../lib/keeperhub/index.js";
 import { fxrpToXrp } from "../packages/chain-adapters/src/index.js";
 import { CreditServiceMarketplace } from "../lib/services/x402_marketplace.js";
 import { signPayment, type PaymentChallenge as X402Challenge } from "../lib/x402/index.js";
+import { ExternalReceiptProofStore } from "../lib/x402/external_receipt_proof_store.js";
+import { AlgorandPaymentAttemptStore } from "../lib/x402/algorand_payment_attempt_store.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -92,6 +94,10 @@ export class ServerState {
 
   /** Durable append-only event journal (enabled when CRED402_DATA_DIR is set). */
   readonly journal?: LedgerJournal;
+  /** Durable public receipt proofs (enabled with the same production data dir). */
+  readonly externalReceiptProofs?: ExternalReceiptProofStore;
+  /** Durable exact-once barrier and reconciliation state for Algorand payments. */
+  readonly algorandPaymentAttempts: AlgorandPaymentAttemptStore;
 
   constructor() {
     this.economy = new Cred402Economy(new Ledger(this.bus, this.clock));
@@ -103,7 +109,18 @@ export class ServerState {
     this.creditOffers = new CreditOffers(this.ledger, this.economy.credit);
     this.seedMarketplace();
     const dataDir = loadConfig().dataDir;
-    if (dataDir) this.journal = new LedgerJournal(dataDir, this.bus);
+    this.algorandPaymentAttempts = new AlgorandPaymentAttemptStore(dataDir || undefined);
+    if (dataDir) {
+      this.journal = new LedgerJournal(dataDir, this.bus);
+      this.externalReceiptProofs = new ExternalReceiptProofStore(dataDir);
+      for (const receipt of this.externalReceiptProofs.list()) {
+        try {
+          this.ledger.restoreExternalReceipt(receipt);
+        } catch {
+          // Invalid or conflicting projections stay excluded from live credit state.
+        }
+      }
+    }
   }
 
   /** List the seller's services across a few pricing strategies (p4 §18). */
@@ -345,6 +362,167 @@ export class ServerState {
       },
       as_of: new Date(now * 1000).toISOString(),
     };
+  }
+
+  /**
+   * Convert a successful Algorand x402 credit-report payment into the same
+   * Casper-rooted Universal Receipt used by the other satellite chains.
+   *
+   * The facilitator authenticates the payer address and transaction, but it
+   * does not assert a Cred402 agent id. Preserve that boundary by using an
+   * address-derived external identity. Repeated delivery of the same settled
+   * transaction returns the existing receipt without crediting revenue twice.
+   */
+  anchorAlgorandCreditScoreSettlement(input: {
+    agentId: string;
+    network: string;
+    networkName: string;
+    usdcAsset: number;
+    amountMicroUsdc: string;
+    payer?: string;
+    receiver: string;
+    transaction?: string;
+    report: unknown;
+  }): { receipt_id: string } | null {
+    const payer = input.payer?.trim();
+    const transaction = input.transaction?.trim();
+    if (!payer || !transaction || !/^\d+$/.test(input.amountMicroUsdc)) {
+      return null;
+    }
+
+    const existing = this.ledger.externalReceipts.list().find(
+      (receipt) =>
+        receipt.origin_chain === input.network &&
+        receipt.settlement_tx_hash === transaction,
+    );
+    if (existing) {
+      const sameSettlement =
+        existing.payer_agent_id === `algorand:${payer}` &&
+        existing.seller_agent_id === this.economy.seller.agent_id &&
+        existing.envelope.seller_address === input.receiver &&
+        existing.asset === `algorand-asa:${input.usdcAsset}` &&
+        existing.amount === input.amountMicroUsdc;
+      if (sameSettlement) {
+        this.persistExternalReceiptProof(existing.receipt_id);
+        return { receipt_id: existing.receipt_id };
+      }
+      return null;
+    }
+
+    const { envelope, receipt_id } = buildUniversalReceipt({
+      origin_chain: input.network,
+      settlement_network: input.networkName,
+      payer_agent_id: `algorand:${payer}`,
+      seller_agent_id: this.economy.seller.agent_id,
+      payer_address: payer,
+      seller_address: input.receiver,
+      asset: `algorand-asa:${input.usdcAsset}`,
+      amount: input.amountMicroUsdc,
+      service_type: "credit-score",
+      request_hash: hashObject({
+        method: "GET",
+        route: "/v1/x402/credit-score/:agentId",
+        agent_id: input.agentId,
+      }),
+      result_hash: hashObject(input.report),
+      payment_proof_hash: hashObject({
+        network: input.network,
+        transaction,
+        payer,
+        receiver: input.receiver,
+        amount_micro_usdc: input.amountMicroUsdc,
+      }),
+      settlement_tx_hash: transaction,
+      nonce: transaction,
+      created_at: this.ledger.clock.now(),
+    });
+
+    if (this.ledger.externalReceipts.get(receipt_id)) {
+      this.persistExternalReceiptProof(receipt_id);
+      return { receipt_id };
+    }
+
+    try {
+      // Algorand settlement is provisional until independently confirmed by
+      // the configured Indexer; only finalized receipts affect credit signals.
+      const anchored = this.ledger.anchorExternalReceipt(envelope, { finalize: false });
+      this.persistExternalReceiptProof(anchored.receipt_id);
+      return anchored;
+    } catch {
+      // Payment delivery must not fail if the local/indexing layer is
+      // temporarily unavailable. The on-chain transaction remains canonical.
+      return null;
+    }
+  }
+
+  /** Live registry first, then the durable content-addressed proof store. */
+  externalReceiptProof(receiptId: string) {
+    return (
+      this.ledger.externalReceipts.get(receiptId) ??
+      this.externalReceiptProofs?.get(receiptId)
+    );
+  }
+
+  finalizeAlgorandExternalReceipt(receiptId: string): void {
+    this.ledger.finalizeExternalReceipt(receiptId);
+    this.persistExternalReceiptProof(receiptId);
+  }
+
+  challengeAlgorandExternalReceipt(receiptId: string): void {
+    this.ledger.challengeExternalReceipt(receiptId);
+    this.persistExternalReceiptProof(receiptId);
+  }
+
+  /** Public, aggregate-only usage proof for the Algorand challenge endpoint. */
+  algorandX402Usage(network: string, usdcAsset: number) {
+    const asset = `algorand-asa:${usdcAsset}`;
+    const byId = new Map(
+      (this.externalReceiptProofs?.list() ?? []).map((receipt) => [receipt.receipt_id, receipt]),
+    );
+    for (const receipt of this.ledger.externalReceipts.list()) byId.set(receipt.receipt_id, receipt);
+    const receipts = [...byId.values()]
+      .filter((receipt) =>
+        receipt.origin_chain === network &&
+        receipt.asset === asset &&
+        receipt.service_type === "credit-score" &&
+        receipt.status === "finalized",
+      )
+      .sort((a, b) => b.anchored_at - a.anchored_at);
+    const totalMicroUsdc = receipts.reduce(
+      (total, receipt) => total + BigInt(receipt.amount),
+      0n,
+    );
+
+    return {
+      schema_version: "cred402.algorand-x402-usage.v1",
+      network,
+      usdc_asset: usdcAsset,
+      paid_requests: receipts.length,
+      unique_payers: new Set(receipts.map((receipt) => receipt.payer_agent_id)).size,
+      total_micro_usdc: totalMicroUsdc.toString(),
+      latest_payment_at: receipts[0]
+        ? new Date(receipts[0].anchored_at * 1000).toISOString()
+        : null,
+      latest_receipts: receipts.slice(0, 10).map((receipt) => ({
+        receipt_id: receipt.receipt_id,
+        transaction: receipt.settlement_tx_hash,
+        amount_micro_usdc: receipt.amount,
+        anchored_at: new Date(receipt.anchored_at * 1000).toISOString(),
+      })),
+    };
+  }
+
+  private persistExternalReceiptProof(receiptId: string): void {
+    if (!this.externalReceiptProofs) return;
+    const receipt = this.ledger.externalReceipts.get(receiptId);
+    if (!receipt) return;
+    try {
+      this.externalReceiptProofs.put(receipt);
+    } catch {
+      // The paid response and live ledger anchor remain valid even if the
+      // durability volume is temporarily unavailable. The proof endpoint can
+      // still serve the live registry until storage recovers.
+    }
   }
   /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
   dataCommons() {

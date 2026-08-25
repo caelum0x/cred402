@@ -110,23 +110,50 @@ export class Ledger {
    * Anchor an external (non-Casper) x402 receipt to Casper and credit the seller
    * agent: the work happened on a satellite chain, the trust settles here.
    */
-  anchorExternalReceipt(ure: UniversalReceiptEnvelope): { receipt_id: string } {
+  anchorExternalReceipt(
+    ure: UniversalReceiptEnvelope,
+    options: { finalize?: boolean } = {},
+  ): { receipt_id: string } {
     const receipt_id = makeReceiptId(ure);
     this.externalReceipts.record_external_receipt(ure, receipt_id);
+    if (options.finalize !== false) this.finalizeExternalReceipt(receipt_id);
+    return { receipt_id };
+  }
+
+  /** Finalize and credit a provisional external receipt exactly once. */
+  finalizeExternalReceipt(receipt_id: string): void {
+    const receipt = this.externalReceipts.get(receipt_id);
+    if (!receipt) throw new Error(`unknown external receipt ${receipt_id}`);
+    if (receipt.status === "finalized") return;
+    if (receipt.status === "challenged") throw new Error("cannot finalize challenged external receipt");
     this.externalReceipts.finalize_external_receipt(receipt_id);
+    this.creditExternalReceipt(receipt);
+  }
+
+  /** Rehydrate the durable receipt projection after a process restart. */
+  restoreExternalReceipt(receipt: ReturnType<ExternalReceiptRegistry["list"]>[number]): void {
+    if (this.externalReceipts.get(receipt.receipt_id)) return;
+    this.externalReceipts.restore_external_receipt(receipt);
+    if (receipt.status === "finalized") this.creditExternalReceipt(receipt);
+  }
+
+  private creditExternalReceipt(receipt: ReturnType<ExternalReceiptRegistry["list"]>[number]): void {
     // Credit the seller agent's revenue + reputation if it is a known Casper agent.
-    if (this.agents.get(ure.seller_agent_id)) {
+    if (this.agents.get(receipt.seller_agent_id)) {
       // amount is in asset smallest units; treat USD-pegged stables as USD micro.
-      const motes = (BigInt(ure.amount) * USD_MICRO_TO_MOTES);
+      const motes = (BigInt(receipt.amount) * USD_MICRO_TO_MOTES);
       this.agents.record_job(
-        ure.seller_agent_id,
-        { receipt_id, amount: motes, timestamp: this.clock.now(), service_type: "monitoring" },
+        receipt.seller_agent_id,
+        { receipt_id: receipt.receipt_id, amount: motes, timestamp: this.clock.now(), service_type: receipt.service_type },
         90,
         false,
       );
-      this.agents.update_reputation(ure.seller_agent_id, +1, receipt_id);
+      this.agents.update_reputation(receipt.seller_agent_id, +1, receipt.receipt_id);
     }
-    return { receipt_id };
+  }
+
+  challengeExternalReceipt(receipt_id: string): void {
+    this.externalReceipts.challenge_external_receipt(receipt_id);
   }
 
   /** Simulated deployed contract package hashes (stable per process). */

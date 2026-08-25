@@ -73,6 +73,17 @@ export class ExternalReceiptRegistry {
     return clone(rec);
   }
 
+  /** Restore a previously verified durable projection without re-emitting chain events. */
+  restore_external_receipt(receipt: ExternalReceipt): void {
+    const check = verifyUniversalReceipt(receipt.envelope, receipt.receipt_id);
+    if (!check.ok) throw new Error(`external receipt restore rejected: ${check.reason}`);
+    if (this.receipts.has(receipt.receipt_id)) return;
+    const nonceKey = `${receipt.envelope.origin_chain}:${receipt.envelope.payer_agent_id}:${receipt.envelope.nonce}`;
+    if (this.usedNonces.has(nonceKey)) throw new Error("external receipt restore nonce replay");
+    this.usedNonces.add(nonceKey);
+    this.receipts.set(receipt.receipt_id, clone(receipt));
+  }
+
   finalize_external_receipt(receipt_id: string): void {
     const r = this.must(receipt_id);
     if (r.status === "anchored") r.status = "finalized";
@@ -80,7 +91,7 @@ export class ExternalReceiptRegistry {
 
   challenge_external_receipt(receipt_id: string): void {
     const r = this.must(receipt_id);
-    r.status = "challenged";
+    if (r.status !== "finalized") r.status = "challenged";
   }
 
   forSeller(seller_agent_id: string): ExternalReceipt[] {

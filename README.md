@@ -286,4 +286,7 @@ A tokenized solar farm (SPV #A17, İzmir) wants a DeFi credit line. Autonomous a
 
 ## License
 
-MIT. Built for the Casper Innovation Track (Agentic AI × DeFi × RWA).
+Apache-2.0 — see [`LICENSE`](LICENSE). The permissive patent grant is
+deliberate: Cred402 is an open-core protocol meant to be implemented by others,
+and the explicit grant reassures enterprise adopters and fellow implementers.
+Built for the Casper Innovation Track (Agentic AI × DeFi × RWA).

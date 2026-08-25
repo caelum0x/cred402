@@ -81,7 +81,12 @@ function config(network: "testnet" | "mainnet" = "testnet") {
   const loaded = loadAlgorandX402Config({
     CRED402_ALGORAND_PAY_TO: VALID_ADDRESS,
     CRED402_ALGORAND_NETWORK: network,
-    ...(network === "mainnet" ? { CRED402_PUBLIC_URL: "https://cred402.example" } : {}),
+    ...(network === "mainnet" ? {
+      CRED402_ENV: "mainnet",
+      CRED402_PUBLIC_URL: "https://cred402.example",
+      CRED402_DATA_DIR: "/tmp/cred402-algorand-test",
+      CRED402_ALGORAND_MAINNET_RELEASE_ACK: "I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS",
+    } : {}),
   });
   if (!loaded.enabled) throw new Error(loaded.reason);
   assert.equal(loaded.enabled, true);
@@ -109,6 +114,9 @@ test("Algorand config is fail-closed without a real pay-to address", () => {
   const unsafeMainnet = loadAlgorandX402Config({
     CRED402_ALGORAND_PAY_TO: VALID_ADDRESS,
     CRED402_ALGORAND_NETWORK: "mainnet",
+    CRED402_ENV: "mainnet",
+    CRED402_DATA_DIR: "/tmp/cred402-algorand-test",
+    CRED402_ALGORAND_MAINNET_RELEASE_ACK: "I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS",
     CRED402_PUBLIC_URL: "http://localhost:4021",
   });
   assert.equal(unsafeMainnet.enabled, false);
@@ -120,6 +128,7 @@ test("Algorand production config pins safe HTTPS origins and bounded facilitator
     NODE_ENV: "production",
     CRED402_ALGORAND_PAY_TO: VALID_ADDRESS,
     CRED402_ALGORAND_NETWORK: "testnet",
+    CRED402_DATA_DIR: "/tmp/cred402-algorand-test",
   });
   assert.equal(missingProductionOrigin.enabled, false);
   if (!missingProductionOrigin.enabled) assert.match(missingProductionOrigin.reason, /pinned HTTPS origin/);
@@ -144,6 +153,7 @@ test("Algorand production config pins safe HTTPS origins and bounded facilitator
     CRED402_ALGORAND_NETWORK: "testnet",
     CRED402_PUBLIC_URL: "https://cred402.example/path-is-normalized",
     CRED402_ALGORAND_FACILITATOR_URL: "https://facilitator.example/",
+    CRED402_DATA_DIR: "/tmp/cred402-algorand-test",
   });
   assert.equal(safeProduction.enabled, true);
   if (safeProduction.enabled) {
@@ -171,6 +181,9 @@ test("public deployment status exposes complete configuration without secrets", 
   const loaded = loadAlgorandX402Config({
     CRED402_ALGORAND_PAY_TO: VALID_ADDRESS,
     CRED402_ALGORAND_NETWORK: "mainnet",
+    CRED402_ENV: "mainnet",
+    CRED402_DATA_DIR: "/tmp/cred402-algorand-test",
+    CRED402_ALGORAND_MAINNET_RELEASE_ACK: "I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS",
     CRED402_PUBLIC_URL: "https://cred402.example",
   });
   const status = describeAlgorandX402(loaded);

@@ -162,6 +162,8 @@ export interface ExternalReceipt {
   asset: string;
   amount: string;
   service_type: string;
+  settlement_tx_hash: string;
+  anchored_at: number;
   status: string;
 }
 

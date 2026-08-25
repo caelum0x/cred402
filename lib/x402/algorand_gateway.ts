@@ -26,6 +26,11 @@ export const ALGORAND_CREDIT_SCORE_ROUTE = "/v1/x402/credit-score/:agentId";
 export const ALGORAND_X402_STATUS_ROUTE = "/v1/x402/algorand/status";
 export const DEFAULT_ALGORAND_FACILITATOR = "https://facilitator.goplausible.xyz";
 export const DEFAULT_CREDIT_SCORE_PRICE_MICRO_USDC = "10000"; // 0.01 USDC
+export const DEFAULT_ALGORAND_INDEXER: Record<AlgorandNetworkName, string> = {
+  testnet: "https://testnet-idx.algonode.cloud",
+  mainnet: "https://mainnet-idx.algonode.cloud",
+};
+export const ALGORAND_MAINNET_RELEASE_ACK = "I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS";
 
 /** Prevent a CDN or browser cache from turning one paid response into a free one. */
 export function algorandX402PrivateResponseHeaders(requestId: string): Record<string, string> {
@@ -40,6 +45,7 @@ export function algorandX402PrivateResponseHeaders(requestId: string): Record<st
 export type AlgorandNetworkName = "testnet" | "mainnet";
 
 export interface AlgorandX402Config {
+  releaseTier: "development" | "testnet" | "mainnet";
   payTo: string;
   networkName: AlgorandNetworkName;
   network: typeof ALGORAND_TESTNET_CAIP2 | typeof ALGORAND_MAINNET_CAIP2;
@@ -47,6 +53,13 @@ export interface AlgorandX402Config {
   priceMicroUsdc: string;
   facilitatorUrl: string;
   facilitatorTimeoutMs: number;
+  indexerUrl: string;
+  indexerToken?: string;
+  indexerTimeoutMs: number;
+  minimumFinalityRounds: number;
+  missingTransactionThreshold: number;
+  reconciliationIntervalMs: number;
+  missingTransactionGraceMs: number;
   /** Canonical deployment origin used in Bazaar resource URLs. Required on Mainnet. */
   publicBaseUrl?: string;
 }
@@ -67,6 +80,14 @@ export interface AlgorandX402PublicStatus {
   pay_to?: string;
   facilitator_url?: string;
   public_origin?: string;
+  release_tier?: "development" | "testnet" | "mainnet";
+  finality?: {
+    indexer_url: string;
+    minimum_rounds: number;
+    missing_transaction_threshold: number;
+    reconciliation_interval_ms: number;
+    missing_transaction_grace_ms: number;
+  };
   discovery: {
     bazaar: true;
     challenge_tag: "x402-global-challenge";
@@ -98,6 +119,14 @@ export function describeAlgorandX402(
     pay_to: result.config.payTo,
     facilitator_url: result.config.facilitatorUrl,
     public_origin: result.config.publicBaseUrl,
+    release_tier: result.config.releaseTier,
+    finality: {
+      indexer_url: result.config.indexerUrl,
+      minimum_rounds: result.config.minimumFinalityRounds,
+      missing_transaction_threshold: result.config.missingTransactionThreshold,
+      reconciliation_interval_ms: result.config.reconciliationIntervalMs,
+      missing_transaction_grace_ms: result.config.missingTransactionGraceMs,
+    },
   };
 }
 
@@ -169,6 +198,28 @@ export function loadAlgorandX402Config(
 
   const mainnet = networkName === "mainnet";
   const production = env.NODE_ENV === "production";
+  const releaseTier = env.CRED402_ENV ?? "development";
+  if (!new Set(["development", "testnet", "mainnet"]).has(releaseTier)) {
+    return { enabled: false, reason: "CRED402_ENV must be development, testnet, or mainnet" };
+  }
+  if ((releaseTier === "mainnet") !== mainnet) {
+    return {
+      enabled: false,
+      reason: "CRED402_ENV=mainnet and CRED402_ALGORAND_NETWORK=mainnet must be enabled together",
+    };
+  }
+  if (mainnet && env.CRED402_ALGORAND_MAINNET_RELEASE_ACK !== ALGORAND_MAINNET_RELEASE_ACK) {
+    return {
+      enabled: false,
+      reason: `CRED402_ALGORAND_MAINNET_RELEASE_ACK must equal ${ALGORAND_MAINNET_RELEASE_ACK}`,
+    };
+  }
+  if ((mainnet || production) && !env.CRED402_DATA_DIR?.trim()) {
+    return {
+      enabled: false,
+      reason: "CRED402_DATA_DIR is required for durable payment replay protection on Mainnet and in production",
+    };
+  }
   let publicBaseUrl: string | undefined;
   if (env.CRED402_PUBLIC_URL?.trim()) {
     try {
@@ -192,9 +243,52 @@ export function loadAlgorandX402Config(
     };
   }
 
+  let indexerUrl: string;
+  try {
+    const parsed = new URL(env.CRED402_ALGORAND_INDEXER_URL ?? DEFAULT_ALGORAND_INDEXER[networkName]);
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+      throw new Error("invalid indexer URL");
+    }
+    indexerUrl = parsed.href.replace(/\/+$/, "");
+  } catch {
+    return {
+      enabled: false,
+      reason: "CRED402_ALGORAND_INDEXER_URL must be an HTTP(S) URL without credentials, query, or fragment",
+    };
+  }
+  if ((mainnet || production) && !indexerUrl.startsWith("https://")) {
+    return { enabled: false, reason: "CRED402_ALGORAND_INDEXER_URL must use HTTPS on Mainnet and in production" };
+  }
+
+  const boundedInteger = (key: string, fallback: number, min: number, max: number): number | undefined => {
+    const value = Number(env[key] ?? fallback);
+    return Number.isSafeInteger(value) && value >= min && value <= max ? value : undefined;
+  };
+  const indexerTimeoutMs = boundedInteger("CRED402_ALGORAND_INDEXER_TIMEOUT_MS", 5000, 250, 30_000);
+  if (indexerTimeoutMs === undefined) {
+    return { enabled: false, reason: "CRED402_ALGORAND_INDEXER_TIMEOUT_MS must be an integer from 250 to 30000" };
+  }
+  const minimumFinalityRounds = boundedInteger("CRED402_ALGORAND_MIN_FINALITY_ROUNDS", 4, 1, 1000);
+  if (minimumFinalityRounds === undefined) {
+    return { enabled: false, reason: "CRED402_ALGORAND_MIN_FINALITY_ROUNDS must be an integer from 1 to 1000" };
+  }
+  const missingTransactionThreshold = boundedInteger("CRED402_ALGORAND_MISSING_TX_THRESHOLD", 3, 2, 100);
+  if (missingTransactionThreshold === undefined) {
+    return { enabled: false, reason: "CRED402_ALGORAND_MISSING_TX_THRESHOLD must be an integer from 2 to 100" };
+  }
+  const reconciliationIntervalMs = boundedInteger("CRED402_ALGORAND_RECONCILE_INTERVAL_MS", 15_000, 1000, 3_600_000);
+  if (reconciliationIntervalMs === undefined) {
+    return { enabled: false, reason: "CRED402_ALGORAND_RECONCILE_INTERVAL_MS must be an integer from 1000 to 3600000" };
+  }
+  const missingTransactionGraceMs = boundedInteger("CRED402_ALGORAND_MISSING_TX_GRACE_MS", 120_000, 30_000, 86_400_000);
+  if (missingTransactionGraceMs === undefined) {
+    return { enabled: false, reason: "CRED402_ALGORAND_MISSING_TX_GRACE_MS must be an integer from 30000 to 86400000" };
+  }
+
   return {
     enabled: true,
     config: {
+      releaseTier: releaseTier as "development" | "testnet" | "mainnet",
       payTo,
       networkName,
       network: mainnet ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2,
@@ -202,6 +296,13 @@ export function loadAlgorandX402Config(
       priceMicroUsdc,
       facilitatorUrl,
       facilitatorTimeoutMs,
+      indexerUrl,
+      indexerToken: env.CRED402_ALGORAND_INDEXER_TOKEN?.trim() || undefined,
+      indexerTimeoutMs,
+      minimumFinalityRounds,
+      missingTransactionThreshold,
+      reconciliationIntervalMs,
+      missingTransactionGraceMs,
       publicBaseUrl,
     },
   };
@@ -272,6 +373,19 @@ export class AlgorandCreditScoreGateway {
               probability_of_default: 0.08,
               eligible: true,
               reason_codes: ["HEALTHY_CREDIT_PROFILE"],
+              payment: {
+                protocol: "x402-v2",
+                network: "algorand:416002",
+                asset: 10458941,
+                amount_micro_usdc: "10000",
+                transaction: "ALGORAND_TRANSACTION_ID",
+                external_receipt_id: "0xCONTENT_ADDRESSED_RECEIPT_ID",
+                external_receipt_url: "https://api.example/v1/x402/external-receipts/0xCONTENT_ADDRESSED_RECEIPT_ID",
+                payment_attempt_url: "https://api.example/v1/x402/algorand/payments/pay_OPAQUE_ID",
+                algorand_finality: "confirmed",
+                confirmations: 4,
+                casper_anchor_status: "finalized",
+              },
             },
             schema: {
               properties: {
@@ -282,8 +396,26 @@ export class AlgorandCreditScoreGateway {
                 probability_of_default: { type: "number", minimum: 0, maximum: 1 },
                 eligible: { type: "boolean" },
                 reason_codes: { type: "array", items: { type: "string" } },
+                payment: {
+                  type: "object",
+                  properties: {
+                    protocol: { type: "string" },
+                    network: { type: "string" },
+                    asset: { type: "integer" },
+                    amount_micro_usdc: { type: "string" },
+                    payer: { type: "string" },
+                    transaction: { type: "string" },
+                    external_receipt_id: { type: ["string", "null"] },
+                    external_receipt_url: { type: ["string", "null"] },
+                    payment_attempt_url: { type: "string" },
+                    algorand_finality: { type: "string", enum: ["pending", "confirmed", "not_found", "mismatch", "unavailable"] },
+                    confirmations: { type: ["integer", "null"] },
+                    casper_anchor_status: { type: "string", enum: ["anchored", "finalized", "challenged", "not_recorded"] },
+                  },
+                  required: ["protocol", "network", "asset", "amount_micro_usdc", "transaction", "external_receipt_id", "external_receipt_url", "payment_attempt_url", "algorand_finality", "confirmations", "casper_anchor_status"],
+                },
               },
-              required: ["schema_version", "agent_id", "score", "risk_band", "probability_of_default", "eligible", "reason_codes"],
+              required: ["schema_version", "agent_id", "score", "risk_band", "probability_of_default", "eligible", "reason_codes", "payment"],
             },
           },
         }),
