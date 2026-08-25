@@ -405,7 +405,7 @@ export class ServerState {
   }
 
   /** Public, aggregate-only usage proof for the Algorand challenge endpoint. */
-  algorandX402Usage(network: string, usdcAsset: number) {
+  algorandX402Usage(network: string, usdcAsset: string) {
     return algorandX402Usage(this.algorandAnchorContext(), network, usdcAsset);
   }
   /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
