@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cred402 Credit Score API — quickstart &amp; docs (x402 on Algorand)</title>
+    <meta
+      name="description"
+      content="Quickstart for the Cred402 Credit Score API: call GET /v1/x402/credit-score/:agentId, pay 0.01 USDC over x402 on Algorand, and receive a verifiable credit report. curl, TypeScript, and Python examples."
+    />
+    <link rel="canonical" href="https://cred402.vercel.app/docs" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/cred402-mark.png" />
+    <meta name="theme-color" content="#5b8cff" />
+
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://cred402.vercel.app/docs" />
+    <meta property="og:title" content="Cred402 Credit Score API — quickstart &amp; docs" />
+    <meta
+      property="og:description"
+      content="Call the pay-per-call agent credit score endpoint over x402 on Algorand. curl, TypeScript, and Python quickstart."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cred402 Credit Score API — quickstart &amp; docs" />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <style>
+      :root {
+        --bg: #0a0e17;
+        --panel: #121826;
+        --panel-2: #182032;
+        --border: #232c40;
+        --text: #e6ebf5;
+        --muted: #8a96ad;
+        --accent: #5b8cff;
+        --accent-2: #7af2c6;
+        --ok: #3ddc97;
+        --warn: #ffcc66;
+        --bad: #ff6b6b;
+        --radius: 12px;
+        font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 600px at 80% -10%, #16213a 0%, var(--bg) 55%);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+      a { color: var(--accent); }
+      .wrap { max-width: 900px; margin: 0 auto; padding: 22px; }
+
+      header.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 30px; }
+      .brand { display: flex; gap: 14px; align-items: center; text-decoration: none; color: inherit; }
+      .logo-mark { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; filter: drop-shadow(0 0 10px rgba(91,140,255,.45)); }
+      .brand h1 { font-size: 22px; margin: 0; letter-spacing: -0.5px; }
+      .brand p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      nav.top a { color: var(--muted); text-decoration: none; margin-left: 18px; font-size: 14px; }
+      nav.top a:hover { color: var(--text); }
+
+      h2.page { font-size: 34px; letter-spacing: -0.8px; margin: 0 0 8px; }
+      p.lede { color: var(--muted); font-size: 17px; margin: 0 0 8px; }
+
+      .toc { display: flex; gap: 8px; flex-wrap: wrap; margin: 22px 0 8px; }
+      .toc a { font-size: 13px; color: var(--muted); text-decoration: none; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px; }
+      .toc a:hover { color: var(--text); border-color: var(--accent); }
+
+      section { margin: 40px 0; scroll-margin-top: 20px; }
+      h3 { font-size: 22px; letter-spacing: -0.4px; margin: 0 0 12px; padding-top: 6px; }
+      h4 { font-size: 15px; margin: 22px 0 8px; color: var(--text); }
+      p { color: var(--text); }
+      p.muted { color: var(--muted); }
+
+      pre.code {
+        background: #0b1120; border: 1px solid var(--border); border-radius: 10px;
+        padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.65; margin: 0 0 6px;
+      }
+      pre.code .c { color: var(--muted); }
+      pre.code .k { color: var(--accent); }
+      pre.code .s { color: var(--accent-2); }
+      p code, li code, td code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; color: var(--accent-2); }
+
+      table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      th { color: var(--muted); font-weight: 600; font-size: 13px; }
+      td:first-child { white-space: nowrap; }
+
+      .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 16px; margin: 16px 0; font-size: 14px; }
+      .note.warn { border-left-color: var(--warn); }
+      .note b { color: var(--text); }
+
+      .pill { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--accent-2); background: var(--panel-2); }
+
+      footer { border-top: 1px solid var(--border); margin-top: 60px; padding: 26px 0; color: var(--muted); font-size: 13px; }
+      footer a { color: var(--muted); text-decoration: none; margin-right: 16px; }
+      footer a:hover { color: var(--text); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="topbar">
+        <a class="brand" href="/">
+          <img class="logo-mark" src="/cred402-mark.png" alt="Cred402" width="40" height="40" />
+          <div>
+            <h1>Cred402</h1>
+            <p>Credit Score API · quickstart</p>
+          </div>
+        </a>
+        <nav class="top">
+          <a href="/pricing">Pricing</a>
+          <a href="/">Console</a>
+          <a href="https://github.com/caelum0x/cred402">GitHub</a>
+        </nav>
+      </header>
+
+      <h2 class="page">Credit Score API</h2>
+      <p class="lede">
+        Score any autonomous agent for <strong>0.01 USDC per call</strong>, paid over the x402
+        protocol on Algorand. No API key, no signup — the payment <em>is</em> the auth.
+      </p>
+
+      <div class="toc">
+        <a href="#endpoint">Endpoint</a>
+        <a href="#flow">Payment flow</a>
+        <a href="#status">Read the price</a>
+        <a href="#curl">curl</a>
+        <a href="#typescript">TypeScript</a>
+        <a href="#python">Python</a>
+        <a href="#response">Response</a>
+        <a href="#errors">Errors</a>
+        <a href="#discovery">Discovery</a>
+      </div>
+
+      <section id="endpoint">
+        <h3>Endpoint</h3>
+        <pre class="code"><span class="k">GET</span> https://cred402-1.onrender.com<span class="k">/v1/x402/credit-score/</span>:agentId</pre>
+        <table>
+          <tr><th>Field</th><th>Value</th></tr>
+          <tr><td>Price</td><td><code>0.01 USDC</code> — 10000 micro-USDC per call</td></tr>
+          <tr><td>Protocol</td><td>x402 v2, <code>exact</code> scheme</td></tr>
+          <tr><td>Settlement chain</td><td>Algorand (USDC ASA)</td></tr>
+          <tr><td>Facilitator</td><td>GoPlausible (<code>facilitator.goplausible.xyz</code>)</td></tr>
+          <tr><td>Auth</td><td>None — the x402 payment authorizes the call</td></tr>
+          <tr><td>Path param</td><td><code>agentId</code> — the Cred402 agent identifier to score (e.g. <code>EvidenceSellerAgent</code>)</td></tr>
+        </table>
+        <div class="note">
+          <b>Always pin the price and receiver from the live 402 challenge</b> (or the free status
+          probe below) before signing. Never hardcode a receiver address in production; read it at
+          request time and reject anything that does not match your expected policy.
+        </div>
+      </section>
+
+      <section id="flow">
+        <h3>The x402 payment flow</h3>
+        <p class="muted">The endpoint follows the standard x402 <code>402 → sign → 200</code> lifecycle:</p>
+        <table>
+          <tr><th>Step</th><th>What happens</th></tr>
+          <tr><td><span class="pill">1</span></td><td>Your agent requests the endpoint. It responds <code>402 Payment Required</code> with a <code>PAYMENT-REQUIRED</code> header declaring the exact price, receiver, network, and USDC asset.</td></tr>
+          <tr><td><span class="pill">2</span></td><td>The x402 client signs a USDC transfer on Algorand for exactly the declared amount and receiver.</td></tr>
+          <tr><td><span class="pill">3</span></td><td>The request is retried with a <code>PAYMENT-SIGNATURE</code> header. The facilitator settles the payment and the endpoint returns <code>200</code> with the credit report and a <code>PAYMENT-RESPONSE</code> header.</td></tr>
+          <tr><td><span class="pill">4</span></td><td>The report includes a content-addressed receipt, independently reconciled against the Algorand Indexer and anchored to Casper.</td></tr>
+        </table>
+      </section>
+
+      <section id="status">
+        <h3>Read the price — free, no wallet</h3>
+        <p class="muted">The status probe is free, secret-free, and never touches a wallet. Use it to pin your client policy.</p>
+        <pre class="code">curl -sS https://cred402-1.onrender.com<span class="k">/v1/x402/algorand/status</span></pre>
+        <p class="muted">It returns the live <code>price_micro_usdc</code>, <code>pay_to</code> receiver, <code>network</code>, <code>usdc_asset</code>, and finality settings. Copy those into explicit client constraints:</p>
+        <pre class="code"><span class="k">export</span> CRED402_ALGORAND_CLIENT_NETWORK=testnet
+<span class="k">export</span> CRED402_ALGORAND_EXPECTED_PAY_TO=&lt;58-char receiver from status&gt;
+<span class="k">export</span> CRED402_ALGORAND_EXPECTED_PRICE_MICRO_USDC=10000
+<span class="k">export</span> CRED402_ALGORAND_MAX_PRICE_MICRO_USDC=10000</pre>
+      </section>
+
+      <section id="curl">
+        <h3>Quickstart: curl</h3>
+        <p class="muted">Inspect the unpaid 402 challenge directly (no payment). The <code>-i</code> flag shows the <code>PAYMENT-REQUIRED</code> header your client will decode and sign against:</p>
+        <pre class="code">curl -i -sS https://cred402-1.onrender.com<span class="k">/v1/x402/credit-score/EvidenceSellerAgent</span>
+
+<span class="c">HTTP/1.1 402 Payment Required</span>
+<span class="c">PAYMENT-REQUIRED: &lt;base64 x402 challenge: price, payTo, network, asset&gt;</span>
+<span class="c">Content-Type: application/json</span>
+
+{
+  <span class="s">"error"</span>: <span class="s">"payment_required"</span>,
+  <span class="s">"message"</span>: <span class="s">"Pay with USDC on Algorand to access this credit report."</span>,
+  <span class="s">"price_micro_usdc"</span>: <span class="s">"10000"</span>,
+  <span class="s">"network"</span>: <span class="s">"algorand:416002"</span>
+}</pre>
+        <div class="note">
+          Completing the payment with raw curl means hand-building and signing an Algorand USDC
+          transfer and base64-encoding the <code>PAYMENT-SIGNATURE</code> header. In practice, use the
+          official x402 client (below), which performs the sign-and-retry for you.
+        </div>
+      </section>
+
+      <section id="typescript">
+        <h3>Quickstart: TypeScript</h3>
+        <p class="muted">Install the official x402 packages, then let the client run the full 402 → sign → retry cycle under your pinned policy.</p>
+        <pre class="code">npm i <span class="s">@x402/core</span> <span class="s">@x402/avm</span> <span class="s">@x402/fetch</span></pre>
+        <pre class="code"><span class="k">import</span> { ExactAvmScheme, toClientAvmSigner } <span class="k">from</span> <span class="s">"@x402/avm"</span>;
+<span class="k">import</span> { wrapFetchWithPaymentFromConfig } <span class="k">from</span> <span class="s">"@x402/fetch"</span>;
+
+<span class="c">// testnet CAIP-2 + USDC ASA — verify against /v1/x402/algorand/status</span>
+<span class="k">const</span> network = <span class="s">"algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="</span>;
+<span class="k">const</span> usdcAsset = 10458941;
+<span class="k">const</span> endpoint = <span class="s">"https://cred402-1.onrender.com/v1/x402/credit-score/EvidenceSellerAgent"</span>;
+
+<span class="c">// Only read the key after you have approved the exact price + receiver.</span>
+<span class="k">const</span> signer = toClientAvmSigner(process.env.CRED402_ALGORAND_CLIENT_PRIVATE_KEY!);
+
+<span class="k">const</span> paidFetch = wrapFetchWithPaymentFromConfig(fetch, {
+  schemes: [{ network, client: <span class="k">new</span> ExactAvmScheme(signer) }],
+  <span class="c">// Reject anything that is not exactly your expected price/receiver/asset.</span>
+  paymentRequirementsSelector: (version, accepts) =&gt; {
+    <span class="k">const</span> r = accepts[0];
+    <span class="k">if</span> (version !== 2 || r.scheme !== <span class="s">"exact"</span> || r.asset !== usdcAsset || r.amount !== <span class="s">"10000"</span>) {
+      <span class="k">throw new</span> Error(<span class="s">"x402 challenge did not match pinned policy"</span>);
+    }
+    <span class="k">return</span> r;
+  },
+});
+
+<span class="k">const</span> res = <span class="k">await</span> paidFetch(endpoint, { headers: { accept: <span class="s">"application/json"</span> } });
+<span class="k">const</span> report = <span class="k">await</span> res.json();
+console.log(report.score, report.risk_band, report.payment.external_receipt_url);</pre>
+        <p class="muted">A complete, policy-hardened example (interactive approval, receipt + usage-feed verification) ships in the repo at <code>examples/algorand-paid-score/typescript.ts</code>.</p>
+      </section>
+
+      <section id="python">
+        <h3>Quickstart: Python 3.10+</h3>
+        <pre class="code">python -m pip install <span class="s">"x402-avm[avm,httpx]==2.0.2"</span></pre>
+        <pre class="code"><span class="k">import</span> os, httpx
+<span class="k">from</span> x402_avm <span class="k">import</span> ExactAvmScheme, to_client_avm_signer
+<span class="k">from</span> x402.clients.httpx <span class="k">import</span> x402_payment_hooks
+
+network = <span class="s">"algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="</span>  <span class="c"># verify via /status</span>
+endpoint = <span class="s">"https://cred402-1.onrender.com/v1/x402/credit-score/EvidenceSellerAgent"</span>
+
+signer = to_client_avm_signer(os.environ[<span class="s">"CRED402_ALGORAND_CLIENT_PRIVATE_KEY"</span>])
+client = httpx.Client()
+client.event_hooks = x402_payment_hooks(
+    schemes=[{<span class="s">"network"</span>: network, <span class="s">"client"</span>: ExactAvmScheme(signer)}],
+)
+
+resp = client.get(endpoint, headers={<span class="s">"accept"</span>: <span class="s">"application/json"</span>})
+report = resp.json()
+print(report[<span class="s">"score"</span>], report[<span class="s">"risk_band"</span>], report[<span class="s">"payment"</span>][<span class="s">"external_receipt_url"</span>])</pre>
+        <p class="muted">Full example: <code>examples/algorand-paid-score/python.py</code> in the repo.</p>
+        <div class="note warn">
+          <b>Key safety:</b> set <code>CRED402_ALGORAND_CLIENT_PRIVATE_KEY</code> (base64, 64 bytes)
+          only in the terminal that runs the call. Never commit it or pass a mnemonic. The payer wallet
+          must be funded and opted into the network's USDC ASA.
+        </div>
+      </section>
+
+      <section id="response">
+        <h3>Response schema</h3>
+        <p class="muted"><code>200 OK</code> · <code>cred402.credit-score.v1</code></p>
+        <table>
+          <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+          <tr><td><code>agent_id</code></td><td>string</td><td>The scored agent identifier</td></tr>
+          <tr><td><code>score</code></td><td>integer 0–100</td><td>Credit score</td></tr>
+          <tr><td><code>risk_band</code></td><td>enum</td><td><code>low</code> · <code>moderate</code> · <code>elevated</code> · <code>high</code></td></tr>
+          <tr><td><code>probability_of_default</code></td><td>number 0–1</td><td>Calibrated PD estimate</td></tr>
+          <tr><td><code>eligible</code></td><td>boolean</td><td>Whether the agent clears the eligibility threshold</td></tr>
+          <tr><td><code>reason_codes</code></td><td>string[]</td><td>Machine-readable drivers of the decision</td></tr>
+          <tr><td><code>payment</code></td><td>object</td><td>x402 settlement details + receipt (below)</td></tr>
+        </table>
+        <h4>The <code>payment</code> object</h4>
+        <pre class="code">{
+  <span class="s">"protocol"</span>: <span class="s">"x402-v2"</span>,
+  <span class="s">"network"</span>: <span class="s">"algorand:416002"</span>,
+  <span class="s">"asset"</span>: 10458941,
+  <span class="s">"amount_micro_usdc"</span>: <span class="s">"10000"</span>,
+  <span class="s">"transaction"</span>: <span class="s">"ALGORAND_TX_ID"</span>,
+  <span class="s">"external_receipt_id"</span>: <span class="s">"0x…"</span>,
+  <span class="s">"external_receipt_url"</span>: <span class="s">"https://cred402-1.onrender.com/v1/x402/external-receipts/0x…"</span>,
+  <span class="s">"algorand_finality"</span>: <span class="s">"confirmed"</span>,     <span class="c">// pending | confirmed | not_found | mismatch | unavailable</span>
+  <span class="s">"casper_anchor_status"</span>: <span class="s">"finalized"</span>   <span class="c">// anchored | finalized | challenged | not_recorded</span>
+}</pre>
+        <p class="muted">Fetch <code>external_receipt_url</code> to independently verify the content-addressed receipt, and cross-check it in the public usage feed at <code>GET /v1/x402/algorand/usage</code>.</p>
+      </section>
+
+      <section id="errors">
+        <h3>Status codes</h3>
+        <table>
+          <tr><th>Code</th><th>Meaning</th></tr>
+          <tr><td><code>200</code></td><td>Paid and settled — credit report returned</td></tr>
+          <tr><td><code>402</code></td><td>Payment required — decode <code>PAYMENT-REQUIRED</code>, sign, retry</td></tr>
+          <tr><td><code>404</code></td><td>Unknown <code>agentId</code></td></tr>
+          <tr><td><code>409</code></td><td>Payment proof replay conflict or already-rejected proof</td></tr>
+          <tr><td><code>202</code></td><td>Settlement in progress — do not pay again; poll the attempt URL</td></tr>
+          <tr><td><code>502</code></td><td>Facilitator unavailable or settlement outcome indeterminate — reconcile via the attempt URL, do not repay</td></tr>
+          <tr><td><code>503</code></td><td>Algorand x402 not configured on this deployment</td></tr>
+        </table>
+        <div class="note">
+          Every paid attempt is idempotent: re-sending the same <code>PAYMENT-SIGNATURE</code> replays
+          the original result rather than charging twice. On a <code>202</code>/<code>502</code>, poll the
+          returned <code>payment_attempt_url</code> instead of paying again.
+        </div>
+      </section>
+
+      <section id="discovery">
+        <h3>Discovery</h3>
+        <p class="muted">
+          The endpoint is registered in the <strong>x402 Bazaar</strong> discovery directory with the
+          tags <code>credit-score</code>, <code>agentic-finance</code>, <code>algorand</code>, and
+          <code>x402-global-challenge</code>, so x402-aware agents can find and price it automatically.
+        </p>
+        <table>
+          <tr><td>Live status</td><td><a href="https://cred402-1.onrender.com/v1/x402/algorand/status">/v1/x402/algorand/status</a></td></tr>
+          <tr><td>Usage feed</td><td><a href="https://cred402-1.onrender.com/v1/x402/algorand/usage">/v1/x402/algorand/usage</a></td></tr>
+          <tr><td>OpenAPI spec</td><td><code>packages/openapi/cred402.v1.yaml</code> (repo)</td></tr>
+          <tr><td>Pricing</td><td><a href="/pricing">/pricing</a></td></tr>
+        </table>
+      </section>
+
+      <footer>
+        <div>
+          <a href="/pricing">Pricing</a>
+          <a href="/">Console</a>
+          <a href="https://cred402-1.onrender.com/v1/x402/algorand/status">Live status</a>
+          <a href="https://github.com/caelum0x/cred402">GitHub</a>
+        </div>
+        <p>Research software on public testnets. Scores are not financial advice; the protocol is unaudited.</p>
+      </footer>
+    </div>
+  </body>
+</html>

@@ -7,6 +7,8 @@
     { "source": "/api/:path*", "destination": "https://cred402-1.onrender.com/api/:path*" },
     { "source": "/v1/:path*", "destination": "https://cred402-1.onrender.com/v1/:path*" },
     { "source": "/graphql", "destination": "https://cred402-1.onrender.com/graphql" },
+    { "source": "/pricing", "destination": "/pricing.html" },
+    { "source": "/docs", "destination": "/api-docs.html" },
     { "source": "/((?!assets/|.*\\.).*)", "destination": "/index.html" }
   ]
 }
