@@ -368,5 +368,11 @@ test("paid report composes the existing oracle, risk model, and verified revenue
   assert.ok(report.score >= 0 && report.score <= 100);
   assert.ok(report.probability_of_default >= 0 && report.probability_of_default <= 1);
   assert.equal(report.provenance.model, "risk-engine-v2");
-  assert.ok(Number.isInteger(report.verified_x402_revenue.receipt_count));
+  assert.ok(Number.isInteger(report.x402_revenue.receipt_count));
+  // The bootstrap seller is seeded demo data — the report must say so honestly.
+  assert.equal(report.demo, true);
+  assert.equal(report.data_source, "seeded_demo");
+  assert.equal(report.x402_revenue.data_source, "seeded_demo");
+  assert.equal(report.provenance.ledger_mode, "simulation");
+  assert.match(report.provenance.disclaimer, /SEEDED DEMO/);
 });

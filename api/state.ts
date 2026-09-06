@@ -332,10 +332,19 @@ export class ServerState {
     const reasonCodes = credit.risk_flags.length
       ? credit.risk_flags.map((flag) => flag.toUpperCase())
       : [credit.eligible ? "HEALTHY_CREDIT_PROFILE" : "NOT_CREDIT_ELIGIBLE"];
+    // A seeded demo agent carries a fabricated track record — every surface that
+    // reports its score MUST say so. An agent scored purely from receipts recorded
+    // in the ledger is `observed_receipts`. A credit product cannot present demo
+    // data as verified revenue.
+    const isDemo = agent.seeded_demo === true;
+    const dataSource: "seeded_demo" | "observed_receipts" = isDemo ? "seeded_demo" : "observed_receipts";
+    const provenance = this.ledger.contractProvenance;
 
     return {
       schema_version: "cred402.credit-score.v1",
       agent_id: agentId,
+      demo: isDemo,
+      data_source: dataSource,
       score: risk.blended_score,
       risk_band: risk.risk_band,
       probability_of_default: risk.pd,
@@ -349,8 +358,9 @@ export class ServerState {
         recommended_limit_cspr: formatCspr(BigInt(credit.recommended_limit_motes)),
         interest_rate_bps: credit.interest_rate_bps,
       },
-      verified_x402_revenue: {
+      x402_revenue: {
         currency: "CSPR",
+        data_source: dataSource,
         all_time_motes: sum(agent.x402_revenue_history).toString(),
         all_time_cspr: formatCspr(sum(agent.x402_revenue_history)),
         last_30_days_motes: sum(last30Days).toString(),
@@ -365,9 +375,16 @@ export class ServerState {
         stake_cspr: formatCspr(agent.stake),
       },
       provenance: {
-        source: "Cred402 Casper-rooted receipt ledger",
+        source: "Cred402 in-memory credit ledger (simulation)",
+        ledger_mode: provenance.ledger_mode,
+        network: provenance.network,
+        anchoring: "Contract suite installed on Casper Testnet (see /api/contracts); per-call receipt anchoring is simulated in this ledger.",
+        data_source: dataSource,
         policy_version: credit.policy_version,
         model: "risk-engine-v2",
+        disclaimer: isDemo
+          ? "This is a SEEDED DEMO agent. Its revenue history is illustrative, not observed on-chain, and must not be treated as a real credit assessment."
+          : "Score reflects x402 receipts recorded in the Cred402 ledger simulation.",
       },
       as_of: new Date(now * 1000).toISOString(),
     };
