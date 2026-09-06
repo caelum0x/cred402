@@ -301,7 +301,9 @@ const server = createServer(async (req, res) => {
         case "/api/events":
           return json(res, 200, state.ledger.bus.since(Number(url.searchParams.get("since") ?? 0)));
         case "/api/contracts":
-          return json(res, 200, state.ledger.contractHashes);
+          // Honest provenance: real Casper Testnet hashes for installed
+          // contracts, `simulated` markers for simulation-only ones.
+          return json(res, 200, state.ledger.contractProvenance);
         case "/api/chain":
           // Canonical Casper Testnet deployment manifest, with cspr.live links,
           // so the console can make on-chain activity observable and verifiable.
