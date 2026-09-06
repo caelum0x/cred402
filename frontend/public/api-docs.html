@@ -90,7 +90,10 @@
 
       .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 16px; margin: 16px 0; font-size: 14px; }
       .note.warn { border-left-color: var(--warn); }
+      .note.ok { border-left-color: var(--ok); }
+      .note.bad { border-left-color: var(--bad); }
       .note b { color: var(--text); }
+      .note a { color: var(--accent); }
 
       .pill { display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--border); color: var(--accent-2); background: var(--panel-2); }
 
@@ -121,6 +124,8 @@
         Score any autonomous agent for <strong>0.01 USDC per call</strong>, paid over the x402
         protocol on Algorand. No API key, no signup — the payment <em>is</em> the auth.
       </p>
+
+      <div class="note" id="live-status" role="status">Checking live endpoint status…</div>
 
       <div class="toc">
         <a href="#endpoint">Endpoint</a>
@@ -330,5 +335,52 @@ print(report[<span class="s">"score"</span>], report[<span class="s">"risk_band"
         <p>Research software on public testnets. Scores are not financial advice; the protocol is unaudited.</p>
       </footer>
     </div>
+
+    <script>
+      // Reflect the real deployment state up top so a developer knows, before
+      // writing any code, whether the paid endpoint is currently live.
+      (function () {
+        var API = "https://cred402-1.onrender.com";
+        var STATUS_URL = API + "/v1/x402/algorand/status";
+        var el = document.getElementById("live-status");
+        if (!el) return;
+        function set(cls, html) { el.className = "note " + cls; el.innerHTML = html; }
+        var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        if (controller) setTimeout(function () { controller.abort(); }, 45000);
+        fetch(STATUS_URL, controller ? { signal: controller.signal } : undefined)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("status " + r.status)); })
+          .then(function (s) {
+            if (s && s.configured === true) {
+              var tier = s.release_tier || "testnet";
+              var micro = s.price_micro_usdc ? String(s.price_micro_usdc) : "10000";
+              var usdc = (Number(micro) / 1e6);
+              set(
+                "ok",
+                "<b>Live now (" + tier + ").</b> The paid endpoint is configured: " +
+                  usdc + " USDC (" + micro + " micro-USDC) on " + (s.network_name || tier) +
+                  " · receiver <code>" + (s.pay_to || "see status probe") + "</code>. " +
+                  'Confirm anytime at <a href="' + STATUS_URL + '">/v1/x402/algorand/status</a>.'
+              );
+            } else {
+              set(
+                "warn",
+                "<b>Currently activating — the paid endpoint is not live on this deployment.</b> " +
+                  "The status probe reports <code>configured:false</code>" +
+                  (s && s.reason ? " (" + s.reason + ")" : "") +
+                  ", so calls return <code>503</code> until the owner completes activation. " +
+                  "The docs below describe the full flow for when it is enabled; watch " +
+                  '<a href="' + STATUS_URL + '">/v1/x402/algorand/status</a>.'
+              );
+            }
+          })
+          .catch(function () {
+            set(
+              "bad",
+              "Could not reach the live status probe (the API may be waking from cold start). " +
+                'Check <a href="' + STATUS_URL + '">' + STATUS_URL + "</a> before relying on availability."
+            );
+          });
+      })();
+    </script>
   </body>
 </html>

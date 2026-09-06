@@ -50,7 +50,7 @@
             "priceCurrency": "USDC",
             "unitText": "per API call"
           },
-          "availability": "https://schema.org/InStock"
+          "availability": "https://schema.org/PreOrder"
         }
       }
     </script>
@@ -161,6 +161,19 @@
       footer a { color: var(--muted); text-decoration: none; margin-right: 16px; }
       footer a:hover { color: var(--text); }
       .disclaimer { margin-top: 14px; font-size: 12px; color: var(--muted); opacity: .85; }
+
+      .badge .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+      .badge.warn { color: var(--warn); background: rgba(255,204,102,.06); }
+      .status-banner {
+        margin: 18px 0 0; padding: 14px 16px; border-radius: 10px;
+        border: 1px solid var(--warn); background: rgba(255,204,102,.06);
+        color: var(--text); font-size: 14px;
+      }
+      .status-banner.ok { border-color: var(--ok); background: rgba(61,220,151,.06); }
+      .status-banner b { color: var(--warn); }
+      .status-banner.ok b { color: var(--ok); }
+      .status-banner a { color: var(--accent); }
+      .illustrative { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
     </style>
   </head>
   <body>
@@ -181,7 +194,8 @@
       </header>
 
       <div class="hero">
-        <span class="badge"><span class="dot"></span> Live on the x402 network · Algorand USDC</span>
+        <span class="badge" id="net-badge"><span class="dot"></span> <span id="net-badge-text">Checking live network status…</span></span>
+        <div class="status-banner" id="status-banner" hidden></div>
         <h2>Credit scores for <span>autonomous AI agents</span>, one call at a time.</h2>
         <p class="lede">
           Cred402 turns every x402 machine-to-machine payment into on-chain reputation. The
@@ -234,7 +248,7 @@
               <li>Discoverable in the x402 Bazaar directory</li>
             </ul>
             <div class="cta-row">
-              <a class="btn primary" href="/docs">Start calling →</a>
+              <a class="btn primary" id="cta-start" href="/docs">Start calling →</a>
             </div>
           </div>
 
@@ -243,9 +257,10 @@
             <table class="spec">
               <tr><td>Method &amp; path</td><td><code>GET /v1/x402/credit-score/:agentId</code></td></tr>
               <tr><td>Base URL</td><td><code>https://cred402-1.onrender.com</code></td></tr>
-              <tr><td>Price</td><td><code>0.01 USDC</code> (10000 micro-USDC)</td></tr>
+              <tr><td>Status</td><td><code id="spec-status">checking…</code></td></tr>
+              <tr><td>Price</td><td><code id="spec-price">0.01 USDC</code> (<span id="spec-price-micro">10000</span> micro-USDC)</td></tr>
               <tr><td>Protocol</td><td><code>x402 v2 (exact)</code></td></tr>
-              <tr><td>Settlement</td><td>USDC on Algorand</td></tr>
+              <tr><td>Network</td><td><code id="spec-network">USDC on Algorand</code></td></tr>
               <tr><td>Facilitator</td><td>GoPlausible</td></tr>
               <tr><td>Free status probe</td><td><code>GET /v1/x402/algorand/status</code></td></tr>
               <tr><td>Public usage feed</td><td><code>GET /v1/x402/algorand/usage</code></td></tr>
@@ -283,7 +298,7 @@ curl -sS https://cred402-1.onrender.com<span class="k">/v1/x402/algorand/status<
         </div>
 
         <div class="code-block">
-          <div class="code-label">Example paid response (HTTP 200)</div>
+          <div class="code-label">Example paid response (HTTP 200) <span class="illustrative">— illustrative values, not a live score</span></div>
           <pre class="code">{
   <span class="s">"schema_version"</span>: <span class="s">"cred402.credit-score.v1"</span>,
   <span class="s">"agent_id"</span>: <span class="s">"EvidenceSellerAgent"</span>,
@@ -333,5 +348,94 @@ curl -sS https://cred402-1.onrender.com<span class="k">/v1/x402/algorand/status<
         </p>
       </footer>
     </div>
+
+    <script>
+      // Status-aware pricing: never present a dead endpoint as a live, buyable
+      // product. Read the free, secret-free status probe and reflect the real
+      // deployment state (activating / testnet / live) in the badge, banner, and CTA.
+      (function () {
+        var API = "https://cred402-1.onrender.com";
+        var STATUS_URL = API + "/v1/x402/algorand/status";
+        var badge = document.getElementById("net-badge");
+        var badgeText = document.getElementById("net-badge-text");
+        var dot = badge ? badge.querySelector(".dot") : null;
+        var banner = document.getElementById("status-banner");
+        var cta = document.getElementById("cta-start");
+        var specStatus = document.getElementById("spec-status");
+        var specPrice = document.getElementById("spec-price");
+        var specPriceMicro = document.getElementById("spec-price-micro");
+        var specNetwork = document.getElementById("spec-network");
+
+        function setBadge(text, warn) {
+          if (badgeText) badgeText.textContent = text;
+          if (badge) badge.classList.toggle("warn", !!warn);
+          if (dot) dot.classList.toggle("warn", !!warn);
+        }
+        function showBanner(html, ok) {
+          if (!banner) return;
+          banner.innerHTML = html;
+          banner.classList.toggle("ok", !!ok);
+          banner.hidden = false;
+        }
+
+        function activating(reason) {
+          setBadge("Activating — endpoint offline", true);
+          if (specStatus) specStatus.textContent = "activating (configured:false)";
+          showBanner(
+            "<b>The paid Credit Score API is not live on this deployment yet.</b> The status probe reports " +
+              "<code>configured:false</code>" +
+              (reason ? " — " + reason : "") +
+              ". Explore the free console and docs meanwhile, or watch the " +
+              '<a href="' + STATUS_URL + '">live status probe</a>.',
+            false
+          );
+          if (cta) { cta.textContent = "Read the docs while it activates →"; cta.setAttribute("href", "/docs"); }
+        }
+
+        function live(s) {
+          var testnet = s.release_tier !== "mainnet";
+          var netLabel = testnet ? "Algorand Testnet USDC" : "Algorand USDC";
+          setBadge("Live on x402 · " + netLabel, false);
+          if (specStatus) specStatus.textContent = "live (configured:true) · " + (s.release_tier || "testnet");
+          if (specNetwork) specNetwork.textContent = (s.network_name || (testnet ? "testnet" : "mainnet")) + " · " + (s.network || "");
+          if (s.price_micro_usdc) {
+            var micro = String(s.price_micro_usdc);
+            var usdc = (Number(micro) / 1e6);
+            if (specPrice) specPrice.textContent = usdc + " USDC";
+            if (specPriceMicro) specPriceMicro.textContent = micro;
+          }
+          if (testnet) {
+            showBanner(
+              "<b>Live on Algorand Testnet.</b> Calls settle in <em>testnet</em> USDC — free to try end to end, " +
+                "not real funds. Mainnet activation is owner-gated.",
+              true
+            );
+          } else {
+            if (banner) banner.hidden = true;
+          }
+          if (cta) { cta.textContent = "Start calling →"; cta.setAttribute("href", "/docs"); }
+        }
+
+        function unavailable() {
+          setBadge("Status unavailable", true);
+          if (specStatus) specStatus.textContent = "unknown (probe unreachable)";
+          showBanner(
+            "Could not reach the live status probe (the API may be waking from cold start). " +
+              'Check <a href="' + STATUS_URL + '">' + STATUS_URL + "</a> directly before relying on availability.",
+            false
+          );
+        }
+
+        var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        if (controller) setTimeout(function () { controller.abort(); }, 45000);
+        fetch(STATUS_URL, controller ? { signal: controller.signal } : undefined)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("status " + r.status)); })
+          .then(function (s) {
+            if (s && s.configured === true) live(s);
+            else activating(s && s.reason);
+          })
+          .catch(function () { unavailable(); });
+      })();
+    </script>
   </body>
 </html>
