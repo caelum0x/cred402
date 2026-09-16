@@ -92,24 +92,26 @@ export const CRED402_MERCHANT_IDENTITY = {
 
 ## Activation (owner-gated)
 
-Nothing here deploys on its own. Set these on the Render service, then redeploy. Full
-variable reference and the fail-closed rules: [`ACTIVATION_CHECKLIST.md`](./ACTIVATION_CHECKLIST.md).
+[`render.yaml`](../render.yaml) now carries the full Mainnet configuration: the
+`mainnet` network/env pair, the Mainnet indexer, the pinned HTTPS public origin, and a
+1GB disk mounted at `/var/data` with `CRED402_DATA_DIR` pointed at it. Applying the
+blueprint moves the service to a **paid starter instance** — Render only attaches
+persistent disks to paid plans, and the free tier sleeps, which would drop paid traffic
+during the October measurement window.
+
+Two values are deliberately `sync: false` and must be typed into the Render dashboard:
 
 ```bash
 CRED402_ALGORAND_PAY_TO=<58-char Mainnet address, opted into USDC ASA 31566704>
-CRED402_ALGORAND_NETWORK=mainnet
-CRED402_ENV=mainnet
 CRED402_ALGORAND_MAINNET_RELEASE_ACK=I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS
-CRED402_PUBLIC_URL=https://cred402-1.onrender.com
-CRED402_ALGORAND_INDEXER_URL=https://mainnet-idx.algonode.cloud
-CRED402_DATA_DIR=/var/data            # must be a mounted persistent disk
 ```
 
-`CRED402_ALGORAND_PAY_TO` is the only variable with no default, and its absence is the
-current 503. Mainnet additionally refuses to enable without the matching `CRED402_ENV`,
-the release acknowledgement, an HTTPS public origin, HTTPS facilitator and indexer, and a
-durable `CRED402_DATA_DIR` — the last one because the payment-replay barrier and the
-receipt projection must survive a restart.
+`CRED402_ALGORAND_PAY_TO` has no default, and its absence is the current 503. The
+acknowledgement is a deliberate human gate on real-money mode, so its value is kept out
+of source. Mainnet also refuses to enable without the matching `CRED402_ENV`, an HTTPS
+public origin, HTTPS facilitator and indexer, and a durable `CRED402_DATA_DIR` — the last
+because the payment-replay barrier and the receipt projection must survive a restart.
+Full variable reference: [`ACTIVATION_CHECKLIST.md`](./ACTIVATION_CHECKLIST.md).
 
 Keep the receiver address stable. Discovery, dashboards, receipts, and rankings all key on
 it, so rotating it fragments the history that the challenge measures.
@@ -133,19 +135,30 @@ Step 2 requires a payer that is **not** the receiver; Mainnet readiness rejects
 self-payment. Do not manufacture synthetic volume — one genuine end-to-end payment proves
 settlement, and bot-shaped retry loops get filed under `dev`.
 
+## Done
+
+- Challenge tag moved to the attribution channel the facilitator actually reads, with
+  the `x402-merchant` identity extension and enforcement in the client, the release gate,
+  the tests, and both buyer examples.
+- `render.yaml` made Mainnet-capable (disk, network/env pair, indexer, paid plan).
+- Merged to `main` and pushed, so the public default branch shows the tagged
+  implementation.
+- Electric Capital taxonomy submission:
+  [electric-capital/open-dev-data#2988](https://github.com/electric-capital/open-dev-data/pull/2988),
+  validated against their parser before opening.
+
 ## Remaining owner actions
 
-1. Set the environment variables above on Render and mount a persistent disk at
-   `CRED402_DATA_DIR`. **This is the single blocker for every other item.**
-2. Opt the receiving account into Mainnet USDC ASA `31566704` and fund it for minimum
-   balance.
-3. Fund an external payer account with Mainnet ALGO + USDC and run the one real payment.
-4. Submit the entry form on the challenge page (deadline September 30).
-5. Submit `https://github.com/caelum0x/cred402` to Electric Capital. The repository is
-   already public and contains the Algorand code under `lib/x402/`, `api/`, `scripts/`,
-   and `examples/algorand-paid-score/`.
-6. Merge the working branch to `main` so the public default branch shows the tagged
-   implementation.
+These need credentials, funds, or an identity that only the owner holds.
+
+1. **Create or choose the Mainnet receiving account**, opt it into USDC ASA `31566704`,
+   and fund it for minimum balance. Nothing else can proceed without this address.
+2. **Apply the blueprint and set the two dashboard values** (`CRED402_ALGORAND_PAY_TO`,
+   `CRED402_ALGORAND_MAINNET_RELEASE_ACK`). The Render CLI token on the build machine is
+   expired — `render login` is an interactive browser flow.
+3. **Fund an external payer** with Mainnet ALGO + USDC and run the one real payment.
+   Payer must not be the receiver; Mainnet readiness rejects self-payment.
+4. **Submit the entry form** on the challenge page — deadline September 30.
 
 ## Landscape at time of writing
 
