@@ -8,6 +8,7 @@ import {
 import { decodePaymentRequiredHeader } from "@x402/core/http";
 import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { validateDiscoveryExtensionSpec } from "@x402/extensions/bazaar";
+import { X402_CHALLENGE_TAG } from "./challenge_tag.js";
 
 export type AlgorandClientNetwork = "testnet" | "mainnet";
 
@@ -135,8 +136,17 @@ export function inspectAlgorandChallenge(
   if (!sameResourceUrl(paymentRequired.resource.url, requestedUrl.href)) {
     throw new Error(`Challenge resource URL does not match the requested endpoint: ${paymentRequired.resource.url}`);
   }
-  if (!paymentRequired.resource.tags?.includes("x402-global-challenge")) {
-    throw new Error("Challenge is missing the x402-global-challenge resource tag");
+  if (!paymentRequired.resource.tags?.includes(X402_CHALLENGE_TAG)) {
+    throw new Error(`Challenge is missing the ${X402_CHALLENGE_TAG} resource tag`);
+  }
+  // Attribution is written from the accepted payment option's `extra.tag` at settlement
+  // time and is never backfilled, so a missing tag silently files this sale under
+  // `direct` instead of the Global x402 Challenge. Treat it as a release blocker.
+  const acceptedTag = (selected.extra as Record<string, unknown> | null | undefined)?.tag;
+  if (acceptedTag !== X402_CHALLENGE_TAG) {
+    throw new Error(
+      `Accepted payment option is missing extra.tag=${X402_CHALLENGE_TAG} (received ${String(acceptedTag)}); settled volume would not be attributed to the challenge`,
+    );
   }
 
   const bazaar = paymentRequired.extensions?.bazaar;

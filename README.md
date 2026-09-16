@@ -50,14 +50,19 @@ Algorand x402 v2 resource:
 GET /v1/x402/credit-score/:agentId
 price: 0.01 USDC
 network: Algorand Testnet or Mainnet (environment-selected)
-tag: x402-global-challenge
+facilitator: https://facilitator.goplausible.xyz
+tag: x402-global-challenge   (accepts[].extra.tag — the attribution channel)
 ```
 
 The paid response combines the existing policy score, ML probability of default,
 eligibility and reason codes, verified x402 revenue, and underwriting provenance.
 Configure `CRED402_ALGORAND_PAY_TO` and the Algorand variables in
 [`.env.example`](.env.example); see [the integration guide](docs/algorand_x402.md)
-for Testnet and Mainnet rollout. Copyable
+for Testnet and Mainnet rollout, and the
+[challenge submission packet](docs/X402_GLOBAL_CHALLENGE.md) for the requirement
+status and the ordered activation runbook. `npm run x402:algorand:challenge-check`
+verifies the live deployment, the Bazaar catalogue entry, and leaderboard
+attribution without signing or paying anything. Copyable
 [TypeScript and Python consumers](examples/algorand-paid-score/) show the full
 `402 → approval → payment retry → settlement proof → finalized usage receipt`
 path against the public endpoint. The console's dedicated **Algorand x402** tab

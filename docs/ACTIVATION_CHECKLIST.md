@@ -95,6 +95,12 @@ Mainnet is intentionally hard to enable by accident. All of the following are re
 | `CRED402_DATA_DIR` | set (durable disk) |
 | facilitator + indexer URLs | must be **HTTPS** |
 
+Mainnet is also the Global x402 Challenge environment. Keep the receiver address stable
+once set — discovery, dashboards, receipts, and leaderboard rankings all key on it — and
+verify attribution after the first payment with `npm run x402:algorand:challenge-check`.
+Submission requirements and the ordered activation runbook:
+[`X402_GLOBAL_CHALLENGE.md`](./X402_GLOBAL_CHALLENGE.md).
+
 `CRED402_PUBLIC_URL` is also recommended on testnet so Bazaar discovery + receipt URLs use
 the canonical origin instead of a request host.
 

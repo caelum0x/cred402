@@ -24,6 +24,7 @@ import {
   ALGORAND_CREDIT_SCORE_ROUTE,
   ALGORAND_X402_STATUS_ROUTE,
   AlgorandCreditScoreGateway,
+  X402_CHALLENGE_TAG,
   algorandX402PrivateResponseHeaders,
   createX402HttpContext,
   describeAlgorandX402,
@@ -225,7 +226,20 @@ test("unpaid credit-score request returns x402 v2 + Algorand USDC + Bazaar metad
   assert.equal(paymentRequired.accepts[0]!.amount, "10000");
   assert.equal(paymentRequired.accepts[0]!.payTo, VALID_ADDRESS);
   assert.ok(paymentRequired.resource.tags?.includes("x402-global-challenge"));
+  // The facilitator attributes challenge volume from accepts[].extra.tag at settlement
+  // time; resource.tags is not persisted into the Bazaar record. Without this the
+  // endpoint settles but never appears under SOURCE -> X402-GLOBAL-CHALLENGE.
+  assert.equal(
+    (paymentRequired.accepts[0]!.extra as Record<string, unknown> | undefined)?.tag,
+    X402_CHALLENGE_TAG,
+    "challenge tag must ride in accepts[].extra.tag for leaderboard attribution",
+  );
   assert.ok(paymentRequired.extensions?.bazaar, "Bazaar discovery declaration is present");
+  const merchant = paymentRequired.extensions?.["x402-merchant"] as
+    | { info?: Record<string, unknown>; schema?: Record<string, unknown> }
+    | undefined;
+  assert.ok(merchant?.info?.name, "merchant identity extension declares a public name");
+  assert.ok(merchant?.schema, "merchant identity extension declares its JSON schema");
   const bazaarValidation = validateDiscoveryExtensionSpec(
     paymentRequired.extensions!.bazaar as Record<string, unknown>,
   );
