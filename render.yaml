@@ -11,32 +11,56 @@ services:
     name: cred402
     runtime: node
     region: oregon
-    plan: free
+    # NOT free: Mainnet needs a persistent disk, and Render only attaches disks to
+    # paid instance types. The free tier also sleeps, which would drop paid traffic
+    # during the challenge's live-measurement window. Applying this blueprint starts
+    # billing the starter instance.
+    plan: starter
     # tsx + typescript live in devDependencies, so install them too (Render sets
     # NODE_ENV=production, which would otherwise skip dev deps).
     buildCommand: npm install --include=dev
     startCommand: npm start
     healthCheckPath: /v1/health
     autoDeploy: true
+    # The x402 payment-replay barrier, the durable receipt proofs, and the ledger
+    # journal all live under CRED402_DATA_DIR. On the ephemeral container filesystem
+    # a restart would erase the replay barrier, so loadAlgorandX402Config refuses to
+    # enable the paid path on Mainnet without a data dir. This is that disk.
+    disk:
+      name: cred402-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # The API already honors the platform PORT; pin a data dir for the journal.
+      # The API already honors the platform PORT; pin the journal to the mounted disk.
       - key: CRED402_DATA_DIR
-        value: /tmp/cred402
-      # Algorand x402 staging is fail-closed until the receiver is entered in
-      # the Render dashboard. Render ignores new sync:false values on an
-      # existing Blueprint, so operators must confirm this variable manually.
+        value: /var/data
+      # Algorand x402 is fail-closed until the receiver is entered in the Render
+      # dashboard. Render ignores new sync:false values on an existing Blueprint, so
+      # operators must confirm this variable manually. Once set on Mainnet, keep it
+      # stable: discovery, receipts and leaderboard rankings all key on this address.
       - key: CRED402_ALGORAND_PAY_TO
         sync: false
+      # Deliberately not committed. Mainnet stays 503 until an operator types this
+      # into the dashboard, exactly as I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS.
+      # Putting the acknowledgement in source would defeat the gate it exists to be.
+      - key: CRED402_ALGORAND_MAINNET_RELEASE_ACK
+        sync: false
       - key: CRED402_ALGORAND_NETWORK
-        value: testnet
+        value: mainnet
+      # Must match the network or the paid path refuses to enable.
+      - key: CRED402_ENV
+        value: mainnet
       - key: CRED402_ALGORAND_PRICE_MICRO_USDC
         value: "10000"
       - key: CRED402_ALGORAND_FACILITATOR_URL
         value: https://facilitator.goplausible.xyz
       - key: CRED402_ALGORAND_FACILITATOR_TIMEOUT_MS
         value: "10000"
+      # Independently confirms USDC finality instead of trusting the facilitator.
+      - key: CRED402_ALGORAND_INDEXER_URL
+        value: https://mainnet-idx.algonode.cloud
       # Required because Render runs with NODE_ENV=production. This prevents
       # forwarded host headers from rewriting the Bazaar resource URL.
       - key: CRED402_PUBLIC_URL
