@@ -39,6 +39,13 @@ export interface Agent {
   credit_score: number;
   active: boolean;
   registered_at: number;
+  /**
+   * True when this agent's track record was seeded for demonstration rather than
+   * accrued from real x402 receipts. Demo agents carry fabricated revenue history
+   * and MUST be labeled as such wherever their score is surfaced — a real credit
+   * product cannot present demo data as verified.
+   */
+  seeded_demo?: boolean;
 }
 
 export interface RevenueEvent {

@@ -40,6 +40,7 @@ export class AgentRegistry {
       credit_score: 0,
       active: true,
       registered_at: this.clock.now(),
+      seeded_demo: false,
     };
     this.agents.set(agent.agent_id, agent);
     this.bus.emit("AgentRegistered", CONTRACT, deployHash(), {
@@ -116,6 +117,9 @@ export class AgentRegistry {
     },
   ): void {
     const a = this.must(agent_id);
+    // Seeding backfills a fabricated track record — mark the agent so every
+    // surface that reports its score can label the data as demo, not verified.
+    a.seeded_demo = true;
     if (profile.revenue_events) a.x402_revenue_history.push(...profile.revenue_events);
     if (profile.total_jobs_completed !== undefined) a.total_jobs_completed = profile.total_jobs_completed;
     if (profile.accuracy_score !== undefined) a.accuracy_score = profile.accuracy_score;

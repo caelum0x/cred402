@@ -118,6 +118,11 @@ async def main() -> None:
         resource = raw_challenge.get("resource", {})
         require(resource.get("url") == endpoint, "Challenge resource URL changed")
         require("x402-global-challenge" in resource.get("tags", []), "Challenge tag is missing")
+        # The facilitator attributes settled volume from the accepted option's extra.tag.
+        require(
+            (selected.get("extra") or {}).get("tag") == "x402-global-challenge",
+            "Accepted payment option is missing extra.tag=x402-global-challenge",
+        )
         print("payment-required", json.dumps(raw_challenge, indent=2))
 
         phrase = f"PAY {amount} MICRO-USDC ON ALGORAND {network_name.upper()} TO {expected_pay_to}"

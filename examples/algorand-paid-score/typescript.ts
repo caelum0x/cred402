@@ -86,6 +86,11 @@ async function main() {
   invariant(challenge.resource?.url, "Challenge resource URL is missing");
   invariant(new URL(challenge.resource.url).href === requested.href, "Challenge resource URL changed");
   invariant(challenge.resource.tags?.includes("x402-global-challenge"), "Challenge tag is missing");
+  // The facilitator attributes settled volume from the accepted option's extra.tag.
+  invariant(
+    (selected.extra as Record<string, unknown> | null | undefined)?.tag === "x402-global-challenge",
+    "Accepted payment option is missing extra.tag=x402-global-challenge",
+  );
   console.log("payment-required", JSON.stringify(challenge, null, 2));
 
   const phrase = `PAY ${selected.amount} MICRO-USDC ON ALGORAND ${networkName.toUpperCase()} TO ${selected.payTo}`;

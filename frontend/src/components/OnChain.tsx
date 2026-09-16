@@ -56,6 +56,16 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
           <Stat label="Events this session" value={`${events.length}`} />
         </div>
 
+        <div className="card wide" style={{ borderLeft: "3px solid var(--warn, #ffcc66)" }}>
+          <p className="muted" style={{ margin: 0 }}>
+            <strong>Simulation mode.</strong> The contracts below are really installed on {manifest.chain}
+            {" "}(verify each on cspr.live). The credit state, scores, and receipts shown across this console
+            are computed by an in-memory simulation of that contract suite — per-call receipt anchoring is
+            simulated, not an on-chain transaction. Real, unknown agents with no receipts return an honest
+            zero/404; seeded demo agents are labeled <code>demo</code> in the API.
+          </p>
+        </div>
+
         <div className="card wide">
           <div className="onchain-head">
             <h3>Deployment</h3>
@@ -105,7 +115,7 @@ export function OnChain({ manifest, events, connected }: OnChainProps) {
             </tbody>
           </table>
           <p className="muted mono-sm" style={{ marginTop: 10 }}>
-            Contract hashes are the real Odra (Rust→Wasm) contracts installed on {manifest.chain}. The event stream is the protocol's live event log for this session.
+            Contract hashes are the real Odra (Rust→Wasm) contracts installed on {manifest.chain}. The event stream is the simulation's event log for this session, not on-chain events.
           </p>
         </div>
 

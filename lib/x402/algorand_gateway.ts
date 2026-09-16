@@ -21,6 +21,7 @@ import {
   declareDiscoveryExtension,
   withBazaar,
 } from "@x402/extensions/bazaar";
+import { X402_CHALLENGE_TAG } from "./challenge_tag.js";
 
 export const ALGORAND_CREDIT_SCORE_ROUTE = "/v1/x402/credit-score/:agentId";
 export const ALGORAND_X402_STATUS_ROUTE = "/v1/x402/algorand/status";
@@ -31,6 +32,38 @@ export const DEFAULT_ALGORAND_INDEXER: Record<AlgorandNetworkName, string> = {
   mainnet: "https://mainnet-idx.algonode.cloud",
 };
 export const ALGORAND_MAINNET_RELEASE_ACK = "I_ACKNOWLEDGE_REAL_USDC_MAINNET_PAYMENTS";
+
+export { X402_CHALLENGE_TAG } from "./challenge_tag.js";
+
+/** Public merchant identity surfaced in Bazaar discovery and the facilitator dashboard. */
+export const CRED402_MERCHANT_IDENTITY = {
+  name: "Cred402 Agent Credit Score",
+  website: "https://cred402.vercel.app",
+  logo: "https://cred402.vercel.app/cred402-logo.png",
+  categories: ["credit-scoring", "agentic-finance", "underwriting", "algorand"],
+} as const;
+
+const MERCHANT_IDENTITY_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object",
+  required: ["name"],
+  properties: {
+    name: { type: "string" },
+    website: { type: "string" },
+    logo: { type: "string" },
+    categories: { type: "array", items: { type: "string" } },
+  },
+} as const;
+
+/** `x402-merchant` extension declaration: who is selling this resource. */
+export function declareMerchantIdentityExtension(): Record<string, unknown> {
+  return {
+    "x402-merchant": {
+      info: { ...CRED402_MERCHANT_IDENTITY },
+      schema: MERCHANT_IDENTITY_SCHEMA,
+    },
+  };
+}
 
 /** Prevent a CDN or browser cache from turning one paid response into a free one. */
 export function algorandX402PrivateResponseHeaders(requestId: string): Record<string, string> {
@@ -336,14 +369,15 @@ export class AlgorandCreditScoreGateway {
           price: {
             asset: config.usdcAsset,
             amount: config.priceMicroUsdc,
-            extra: { name: "USDC", decimals: 6 },
+            // `tag` is the attribution channel the facilitator reads at settlement.
+            extra: { name: "USDC", decimals: 6, tag: X402_CHALLENGE_TAG },
           },
           maxTimeoutSeconds: 60,
         },
         description: "Cred402 agent credit score, default probability, eligibility, and verified x402 revenue signals.",
         serviceName: "Cred402 Agent Credit Score",
         mimeType: "application/json",
-        tags: ["x402-global-challenge", "credit-score", "agentic-finance", "algorand"],
+        tags: [X402_CHALLENGE_TAG, "credit-score", "agentic-finance", "algorand"],
         unpaidResponseBody: () => ({
           contentType: "application/json",
           body: {
@@ -353,7 +387,9 @@ export class AlgorandCreditScoreGateway {
             network: config.network,
           },
         }),
-        extensions: declareDiscoveryExtension({
+        extensions: {
+          ...declareMerchantIdentityExtension(),
+          ...declareDiscoveryExtension({
           pathParams: { agentId: "EvidenceSellerAgent" },
           pathParamsSchema: {
             properties: {
@@ -418,7 +454,8 @@ export class AlgorandCreditScoreGateway {
               required: ["schema_version", "agent_id", "score", "risk_band", "probability_of_default", "eligible", "reason_codes", "payment"],
             },
           },
-        }),
+          }),
+        },
       },
     });
   }

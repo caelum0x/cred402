@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cred402 Credit Score API — pay-per-call credit for x402 AI agents</title>
+    <meta
+      name="description"
+      content="The agent credit bureau. Cred402's pay-per-call Credit Score API prices any autonomous x402 agent for 0.01 USDC per call over the x402 protocol on Algorand — no API key, no subscription, no signup."
+    />
+    <link rel="canonical" href="https://cred402.vercel.app/pricing" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/cred402-mark.png" />
+    <meta name="theme-color" content="#5b8cff" />
+
+    <!-- Open Graph / social -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cred402.vercel.app/pricing" />
+    <meta property="og:title" content="Cred402 Credit Score API — pay-per-call credit for x402 AI agents" />
+    <meta
+      property="og:description"
+      content="Score any autonomous agent for 0.01 USDC per call over x402 on Algorand. No API key. No subscription. Pay-per-call credit intelligence for the agent economy."
+    />
+    <meta property="og:image" content="/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Cred402 Credit Score API — pay-per-call credit for x402 AI agents" />
+    <meta
+      name="twitter:description"
+      content="Score any autonomous agent for 0.01 USDC per call over x402 on Algorand. No API key, no signup — the credit layer on top of x402."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <!-- Structured data for discovery -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": "Cred402 Agent Credit Score API",
+        "description": "Pay-per-call credit score, default probability, and eligibility for autonomous x402 AI agents. Settled over the x402 protocol in USDC on Algorand.",
+        "brand": { "@type": "Brand", "name": "Cred402" },
+        "category": "Developer API",
+        "url": "https://cred402.vercel.app/pricing",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.01",
+          "priceCurrency": "USDC",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "0.01",
+            "priceCurrency": "USDC",
+            "unitText": "per API call"
+          },
+          "availability": "https://schema.org/PreOrder"
+        }
+      }
+    </script>
+
+    <style>
+      :root {
+        --bg: #0a0e17;
+        --panel: #121826;
+        --panel-2: #182032;
+        --border: #232c40;
+        --text: #e6ebf5;
+        --muted: #8a96ad;
+        --accent: #5b8cff;
+        --accent-2: #7af2c6;
+        --ok: #3ddc97;
+        --warn: #ffcc66;
+        --radius: 12px;
+        font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(1200px 600px at 80% -10%, #16213a 0%, var(--bg) 55%);
+        color: var(--text);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+      code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+      a { color: var(--accent); }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 22px; }
+
+      header.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .brand { display: flex; gap: 14px; align-items: center; text-decoration: none; color: inherit; }
+      .logo-mark { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; filter: drop-shadow(0 0 10px rgba(91,140,255,.45)); }
+      .brand h1 { font-size: 22px; margin: 0; letter-spacing: -0.5px; }
+      .brand p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      nav.top a { color: var(--muted); text-decoration: none; margin-left: 18px; font-size: 14px; }
+      nav.top a:hover { color: var(--text); }
+
+      .hero { padding: 56px 0 30px; }
+      .badge {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px;
+        color: var(--accent-2); font-size: 12px; background: rgba(122,242,198,.05);
+      }
+      .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+      .hero h2 { font-size: clamp(30px, 5vw, 46px); line-height: 1.1; letter-spacing: -1px; margin: 18px 0 14px; }
+      .hero h2 span { color: var(--accent); }
+      .hero p.lede { font-size: 18px; color: var(--muted); max-width: 640px; }
+      .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 11px 20px; border-radius: 10px; font-size: 15px; font-weight: 600;
+        text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--panel-2);
+        transition: .15s;
+      }
+      .btn:hover { border-color: var(--accent); }
+      .btn.primary { background: linear-gradient(180deg, #5b8cff, #3a6bdd); border-color: transparent; color: #fff; }
+
+      section { margin: 44px 0; }
+      h3.section-title { font-size: 24px; letter-spacing: -0.4px; margin: 0 0 6px; }
+      p.section-sub { color: var(--muted); margin: 0 0 22px; }
+
+      .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+      .card h4 { margin: 0 0 8px; font-size: 16px; }
+      .card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+      .pricing { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: stretch; }
+      @media (max-width: 720px) { .pricing { grid-template-columns: 1fr; } }
+      .price-card { background: linear-gradient(180deg, var(--panel), #0e1524); border: 1px solid var(--accent); border-radius: 16px; padding: 28px; }
+      .price-card .amount { font-size: 46px; font-weight: 700; letter-spacing: -1px; }
+      .price-card .amount small { font-size: 16px; color: var(--muted); font-weight: 500; }
+      .price-card .sub { color: var(--accent-2); font-size: 13px; margin-top: 2px; }
+      ul.features { list-style: none; padding: 0; margin: 20px 0 0; }
+      ul.features li { padding: 7px 0 7px 26px; position: relative; font-size: 14px; color: var(--text); }
+      ul.features li::before { content: "✓"; position: absolute; left: 0; color: var(--ok); font-weight: 700; }
+      .spec-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+      table.spec { width: 100%; border-collapse: collapse; font-size: 14px; }
+      table.spec td { padding: 9px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+      table.spec tr:last-child td { border-bottom: none; }
+      table.spec td:first-child { color: var(--muted); white-space: nowrap; padding-right: 16px; }
+      table.spec td:last-child { text-align: right; }
+      table.spec code { color: var(--accent-2); font-size: 13px; word-break: break-all; }
+
+      pre.code {
+        background: #0b1120; border: 1px solid var(--border); border-radius: 10px;
+        padding: 16px 18px; overflow-x: auto; font-size: 13px; line-height: 1.6; margin: 0;
+      }
+      pre.code .c { color: var(--muted); }
+      pre.code .k { color: var(--accent); }
+      pre.code .s { color: var(--accent-2); }
+      .code-block { margin-top: 14px; }
+      .code-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 7px; }
+
+      .steps { counter-reset: step; display: grid; gap: 14px; }
+      .step { display: flex; gap: 14px; align-items: flex-start; }
+      .step .n {
+        counter-increment: step; flex: 0 0 auto;
+        width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--accent);
+        color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+      }
+      .step .n::before { content: counter(step); }
+      .step div p { margin: 0; color: var(--muted); font-size: 14px; }
+      .step div b { color: var(--text); }
+
+      footer { border-top: 1px solid var(--border); margin-top: 60px; padding: 26px 0; color: var(--muted); font-size: 13px; }
+      footer a { color: var(--muted); text-decoration: none; margin-right: 16px; }
+      footer a:hover { color: var(--text); }
+      .disclaimer { margin-top: 14px; font-size: 12px; color: var(--muted); opacity: .85; }
+
+      .badge .dot.warn { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
+      .badge.warn { color: var(--warn); background: rgba(255,204,102,.06); }
+      .status-banner {
+        margin: 18px 0 0; padding: 14px 16px; border-radius: 10px;
+        border: 1px solid var(--warn); background: rgba(255,204,102,.06);
+        color: var(--text); font-size: 14px;
+      }
+      .status-banner.ok { border-color: var(--ok); background: rgba(61,220,151,.06); }
+      .status-banner b { color: var(--warn); }
+      .status-banner.ok b { color: var(--ok); }
+      .status-banner a { color: var(--accent); }
+      .illustrative { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="topbar">
+        <a class="brand" href="/">
+          <img class="logo-mark" src="/cred402-mark.png" alt="Cred402" width="40" height="40" />
+          <div>
+            <h1>Cred402</h1>
+            <p>The credit bureau for autonomous agents</p>
+          </div>
+        </a>
+        <nav class="top">
+          <a href="#pricing">Pricing</a>
+          <a href="/docs">API Docs</a>
+          <a href="/">Console</a>
+        </nav>
+      </header>
+
+      <div class="hero">
+        <span class="badge" id="net-badge"><span class="dot"></span> <span id="net-badge-text">Checking live network status…</span></span>
+        <div class="status-banner" id="status-banner" hidden></div>
+        <h2>Credit scores for <span>autonomous AI agents</span>, one call at a time.</h2>
+        <p class="lede">
+          Cred402 turns every x402 machine-to-machine payment into on-chain reputation. The
+          <strong>Credit Score API</strong> underwrites any agent — score, default probability,
+          eligibility, and verified revenue signals — for <strong>0.01 USDC per call</strong>. No API
+          key. No subscription. No signup. Your agent pays over x402 and gets an answer.
+        </p>
+        <div class="cta-row">
+          <a class="btn primary" href="#pricing">See pricing</a>
+          <a class="btn" href="/docs">Read the API docs →</a>
+        </div>
+      </div>
+
+      <section>
+        <h3 class="section-title">What you get</h3>
+        <p class="section-sub">A single GET call returns a full credit report plus a verifiable x402 receipt.</p>
+        <div class="grid">
+          <div class="card">
+            <h4>Credit score &amp; risk band</h4>
+            <p>A 0–100 score with a low / moderate / elevated / high risk band, driven by a logistic PD model.</p>
+          </div>
+          <div class="card">
+            <h4>Default probability</h4>
+            <p>Calibrated probability-of-default plus machine-readable reason codes for every decision.</p>
+          </div>
+          <div class="card">
+            <h4>Eligibility signal</h4>
+            <p>A straight <code>eligible</code> boolean for gating credit lines, payouts, or agent-to-agent trust.</p>
+          </div>
+          <div class="card">
+            <h4>Verifiable receipt</h4>
+            <p>Every paid call returns a content-addressed receipt anchored to Casper — independently provable.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing">
+        <h3 class="section-title">Pricing</h3>
+        <p class="section-sub">Pure pay-per-call. You are billed only for the calls your agent makes.</p>
+        <div class="pricing">
+          <div class="price-card">
+            <div class="amount">0.01 <small>USDC</small></div>
+            <div class="sub">per API call · settled over x402 on Algorand</div>
+            <ul class="features">
+              <li>No API key, account, or signup required</li>
+              <li>No monthly minimum or subscription</li>
+              <li>Exact 402 → sign → 200 flow via the official x402 SDK</li>
+              <li>Independent USDC finality + Casper-anchored receipt per call</li>
+              <li>Free, secret-free status probe to read live config</li>
+              <li>Discoverable in the x402 Bazaar directory</li>
+            </ul>
+            <div class="cta-row">
+              <a class="btn primary" id="cta-start" href="/docs">Start calling →</a>
+            </div>
+          </div>
+
+          <div class="spec-card">
+            <h4 style="margin:0 0 14px;">Endpoint at a glance</h4>
+            <table class="spec">
+              <tr><td>Method &amp; path</td><td><code>GET /v1/x402/credit-score/:agentId</code></td></tr>
+              <tr><td>Base URL</td><td><code>https://cred402-1.onrender.com</code></td></tr>
+              <tr><td>Status</td><td><code id="spec-status">checking…</code></td></tr>
+              <tr><td>Price</td><td><code id="spec-price">0.01 USDC</code> (<span id="spec-price-micro">10000</span> micro-USDC)</td></tr>
+              <tr><td>Protocol</td><td><code>x402 v2 (exact)</code></td></tr>
+              <tr><td>Network</td><td><code id="spec-network">USDC on Algorand</code></td></tr>
+              <tr><td>Facilitator</td><td>GoPlausible</td></tr>
+              <tr><td>Free status probe</td><td><code>GET /v1/x402/algorand/status</code></td></tr>
+              <tr><td>Public usage feed</td><td><code>GET /v1/x402/algorand/usage</code></td></tr>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="section-title">How an agent calls it</h3>
+        <p class="section-sub">Four steps, fully automated by the official x402 client. No key is read until the payment is approved.</p>
+        <div class="steps">
+          <div class="step">
+            <div class="n"></div>
+            <div><p><b>Read the price.</b> Hit the free status probe (below) or the endpoint itself to receive an HTTP <code>402 Payment Required</code> with the exact price, receiver, network, and USDC asset.</p></div>
+          </div>
+          <div class="step">
+            <div class="n"></div>
+            <div><p><b>Sign the payment.</b> The x402 client signs a USDC transfer on Algorand for the exact amount and receiver declared in the challenge — nothing more.</p></div>
+          </div>
+          <div class="step">
+            <div class="n"></div>
+            <div><p><b>Retry with proof.</b> The signed <code>PAYMENT-SIGNATURE</code> is attached and the request is replayed. The facilitator settles it and the endpoint returns <code>200</code> with the credit report.</p></div>
+          </div>
+          <div class="step">
+            <div class="n"></div>
+            <div><p><b>Verify the receipt.</b> The response carries a content-addressed receipt id + URL, confirmed against the Algorand Indexer and anchored to Casper.</p></div>
+          </div>
+        </div>
+
+        <div class="code-block">
+          <div class="code-label">Read the live price — free, no wallet</div>
+          <pre class="code"><span class="c"># Returns network, USDC asset id, exact price, and receiver</span>
+curl -sS https://cred402-1.onrender.com<span class="k">/v1/x402/algorand/status</span></pre>
+        </div>
+
+        <div class="code-block">
+          <div class="code-label">Example paid response (HTTP 200) <span class="illustrative">— illustrative values, not a live score</span></div>
+          <pre class="code">{
+  <span class="s">"schema_version"</span>: <span class="s">"cred402.credit-score.v1"</span>,
+  <span class="s">"agent_id"</span>: <span class="s">"EvidenceSellerAgent"</span>,
+  <span class="s">"score"</span>: 82,
+  <span class="s">"risk_band"</span>: <span class="s">"low"</span>,
+  <span class="s">"probability_of_default"</span>: 0.08,
+  <span class="s">"eligible"</span>: true,
+  <span class="s">"reason_codes"</span>: [<span class="s">"HEALTHY_CREDIT_PROFILE"</span>],
+  <span class="s">"payment"</span>: {
+    <span class="s">"protocol"</span>: <span class="s">"x402-v2"</span>,
+    <span class="s">"network"</span>: <span class="s">"algorand:416002"</span>,
+    <span class="s">"asset"</span>: 10458941,
+    <span class="s">"amount_micro_usdc"</span>: <span class="s">"10000"</span>,
+    <span class="s">"transaction"</span>: <span class="s">"ALGORAND_TRANSACTION_ID"</span>,
+    <span class="s">"external_receipt_url"</span>: <span class="s">"https://cred402-1.onrender.com/v1/x402/external-receipts/0x…"</span>,
+    <span class="s">"algorand_finality"</span>: <span class="s">"confirmed"</span>,
+    <span class="s">"casper_anchor_status"</span>: <span class="s">"finalized"</span>
+  }
+}</pre>
+        </div>
+        <div class="cta-row">
+          <a class="btn primary" href="/docs">Full quickstart: curl, TypeScript &amp; Python →</a>
+        </div>
+      </section>
+
+      <section>
+        <h3 class="section-title">The credit layer on top of x402</h3>
+        <p class="section-sub" style="max-width:680px;">
+          x402 is fee-free and credit-blind by design. Cred402 sits on top of it: it reads x402
+          payment history as verifiable cash-flow, scores agent reliability, and prices working capital.
+          The Credit Score API is that intelligence, sold the same way agents pay for everything else —
+          pay-per-call over x402.
+        </p>
+      </section>
+
+      <footer>
+        <div>
+          <a href="/">Console</a>
+          <a href="/docs">API Docs</a>
+          <a href="https://cred402-1.onrender.com/v1/x402/algorand/status">Live status</a>
+          <a href="https://github.com/caelum0x/cred402">GitHub</a>
+        </div>
+        <p class="disclaimer">
+          Cred402 is research software operating on public testnets. The credit-scoring endpoint is live
+          and monetizable, but scores are not financial advice and the protocol is unaudited — do not use
+          for real lending or KYC decisions without an independent audit.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // Status-aware pricing: never present a dead endpoint as a live, buyable
+      // product. Read the free, secret-free status probe and reflect the real
+      // deployment state (activating / testnet / live) in the badge, banner, and CTA.
+      (function () {
+        var API = "https://cred402-1.onrender.com";
+        var STATUS_URL = API + "/v1/x402/algorand/status";
+        var badge = document.getElementById("net-badge");
+        var badgeText = document.getElementById("net-badge-text");
+        var dot = badge ? badge.querySelector(".dot") : null;
+        var banner = document.getElementById("status-banner");
+        var cta = document.getElementById("cta-start");
+        var specStatus = document.getElementById("spec-status");
+        var specPrice = document.getElementById("spec-price");
+        var specPriceMicro = document.getElementById("spec-price-micro");
+        var specNetwork = document.getElementById("spec-network");
+
+        function setBadge(text, warn) {
+          if (badgeText) badgeText.textContent = text;
+          if (badge) badge.classList.toggle("warn", !!warn);
+          if (dot) dot.classList.toggle("warn", !!warn);
+        }
+        function showBanner(html, ok) {
+          if (!banner) return;
+          banner.innerHTML = html;
+          banner.classList.toggle("ok", !!ok);
+          banner.hidden = false;
+        }
+
+        function activating(reason) {
+          setBadge("Activating — endpoint offline", true);
+          if (specStatus) specStatus.textContent = "activating (configured:false)";
+          showBanner(
+            "<b>The paid Credit Score API is not live on this deployment yet.</b> The status probe reports " +
+              "<code>configured:false</code>" +
+              (reason ? " — " + reason : "") +
+              ". Explore the free console and docs meanwhile, or watch the " +
+              '<a href="' + STATUS_URL + '">live status probe</a>.',
+            false
+          );
+          if (cta) { cta.textContent = "Read the docs while it activates →"; cta.setAttribute("href", "/docs"); }
+        }
+
+        function live(s) {
+          var testnet = s.release_tier !== "mainnet";
+          var netLabel = testnet ? "Algorand Testnet USDC" : "Algorand USDC";
+          setBadge("Live on x402 · " + netLabel, false);
+          if (specStatus) specStatus.textContent = "live (configured:true) · " + (s.release_tier || "testnet");
+          if (specNetwork) specNetwork.textContent = (s.network_name || (testnet ? "testnet" : "mainnet")) + " · " + (s.network || "");
+          if (s.price_micro_usdc) {
+            var micro = String(s.price_micro_usdc);
+            var usdc = (Number(micro) / 1e6);
+            if (specPrice) specPrice.textContent = usdc + " USDC";
+            if (specPriceMicro) specPriceMicro.textContent = micro;
+          }
+          if (testnet) {
+            showBanner(
+              "<b>Live on Algorand Testnet.</b> Calls settle in <em>testnet</em> USDC — free to try end to end, " +
+                "not real funds. Mainnet activation is owner-gated.",
+              true
+            );
+          } else {
+            if (banner) banner.hidden = true;
+          }
+          if (cta) { cta.textContent = "Start calling →"; cta.setAttribute("href", "/docs"); }
+        }
+
+        function unavailable() {
+          setBadge("Status unavailable", true);
+          if (specStatus) specStatus.textContent = "unknown (probe unreachable)";
+          showBanner(
+            "Could not reach the live status probe (the API may be waking from cold start). " +
+              'Check <a href="' + STATUS_URL + '">' + STATUS_URL + "</a> directly before relying on availability.",
+            false
+          );
+        }
+
+        var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+        if (controller) setTimeout(function () { controller.abort(); }, 45000);
+        fetch(STATUS_URL, controller ? { signal: controller.signal } : undefined)
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("status " + r.status)); })
+          .then(function (s) {
+            if (s && s.configured === true) live(s);
+            else activating(s && s.reason);
+          })
+          .catch(function () { unavailable(); });
+      })();
+    </script>
+  </body>
+</html>

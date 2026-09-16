@@ -38,7 +38,7 @@ export class CasperAdapter implements ChainAdapter {
   async bindAgentAddress(input: AddressBindingEnvelope): Promise<TransactionResult> {
     try {
       const b = this.ledger.bindings.bind_external_address(input);
-      return { ok: true, tx_hash: this.ledger.contractHashes.AddressBindingRegistry, detail: `${b.external_chain}:${b.external_address}` };
+      return { ok: true, tx_hash: this.ledger.contractHashes.AddressBindingRegistry!, detail: `${b.external_chain}:${b.external_address}` };
     } catch (err) {
       return { ok: false, tx_hash: "", detail: (err as Error).message };
     }
@@ -81,12 +81,12 @@ export class CasperAdapter implements ChainAdapter {
   /** Credit executes on satellites; on Casper a "draw" only confirms exposure. */
   async drawCredit(input: CreditDrawRequest): Promise<TransactionResult> {
     this.ledger.notes.consume_can(input.note.note_id, BigInt(input.amount));
-    return { ok: true, tx_hash: this.ledger.contractHashes.CreditAuthorizationNotes };
+    return { ok: true, tx_hash: this.ledger.contractHashes.CreditAuthorizationNotes! };
   }
 
   async repayCredit(input: CreditRepaymentRequest): Promise<TransactionResult> {
     this.ledger.exposure.decrease_exposure(input.agent_id, BigInt(input.amount));
-    return { ok: true, tx_hash: this.ledger.contractHashes.GlobalExposureManager };
+    return { ok: true, tx_hash: this.ledger.contractHashes.GlobalExposureManager! };
   }
 
   async *watchEvents(filter: ChainEventFilter): AsyncIterable<ChainEvent> {
@@ -104,7 +104,7 @@ export class CasperAdapter implements ChainAdapter {
   confirmSatelliteDraw(noteId: string, amount: bigint): TransactionResult {
     try {
       this.ledger.notes.consume_can(noteId, amount);
-      return { ok: true, tx_hash: this.ledger.contractHashes.CreditAuthorizationNotes };
+      return { ok: true, tx_hash: this.ledger.contractHashes.CreditAuthorizationNotes! };
     } catch (err) {
       return { ok: false, tx_hash: "", detail: (err as Error).message };
     }

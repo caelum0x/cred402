@@ -106,8 +106,14 @@ base64-encoded x402 v2 declaration and includes:
 
 - Algorand Testnet CAIP-2 network and USDC ASA `10458941`
 - `exact` payment scheme and the configured receiver
-- Bazaar input/output schema
-- `x402-global-challenge` resource tag
+- Bazaar input/output schema and the `x402-merchant` identity extension
+- `x402-global-challenge` in the accepted option's `extra.tag`, plus the same tag in the
+  x402 `resource.tags` array
+
+The facilitator writes Global x402 Challenge attribution at settlement time from
+`accepts[].extra.tag` and never backfills it, so the tag has to be deployed before the
+first real payment. `resource.tags` alone is not enough — see
+[`X402_GLOBAL_CHALLENGE.md`](./X402_GLOBAL_CHALLENGE.md).
 
 After a compatible client sends `PAYMENT-SIGNATURE`, Cred402 verifies through
 the facilitator, atomically claims a durable digest of that proof, computes the
@@ -208,7 +214,10 @@ an unavailable usage endpoint is reported as an error instead.
 7. Make one real external Mainnet payment and confirm USDC arrives at the receiver.
 8. Confirm the attempt reaches `confirmed`, the receipt reaches `finalized`, and
    the resource is visible through the facilitator's Bazaar discovery.
-9. Record the public endpoint, transaction ID, repository, and finalized proof.
+9. Run `npm run x402:algorand:challenge-check` to confirm the catalogue entry carries
+   `extra.tag=x402-global-challenge` and that the receiver appears on the challenge
+   leaderboard rather than under `src=direct`.
+10. Record the public endpoint, transaction ID, repository, and finalized proof.
 
 The operator endpoint `GET /v1/x402/algorand/payments/:attemptId` exposes only
 coarse lifecycle, transaction, confirmation count, refund state, and public proof

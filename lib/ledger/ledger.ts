@@ -26,6 +26,7 @@ import type { UniversalReceiptEnvelope } from "../../crosschain/standards/receip
 import { makeReceiptId } from "../../crosschain/standards/receipts.js";
 import { generateAgentKeypair, type AgentKeypair } from "../x402/keys.js";
 import { deployHash } from "../core/hash.js";
+import { buildContractHashes, buildContractProvenance, type ContractProvenance } from "./contract_provenance.js";
 
 /** Normalized cross-chain FX: 1 CSPR = $0.04 → 1 USD micro-unit = 25_000 motes. */
 export const USD_MICRO_TO_MOTES = 25_000n;
@@ -156,28 +157,20 @@ export class Ledger {
     this.externalReceipts.challenge_external_receipt(receipt_id);
   }
 
-  /** Simulated deployed contract package hashes (stable per process). */
-  readonly contractHashes = {
-    AgentRegistry: `hash-${deployHash().slice(0, 40)}`,
-    AgentPassport: `hash-${deployHash().slice(0, 40)}`,
-    X402ReceiptRegistry: `hash-${deployHash().slice(0, 40)}`,
-    RWAAssetRegistry: `hash-${deployHash().slice(0, 40)}`,
-    RWAEvidenceRegistry: `hash-${deployHash().slice(0, 40)}`,
-    ReputationEngine: `hash-${deployHash().slice(0, 40)}`,
-    AgentCreditPool: `hash-${deployHash().slice(0, 40)}`,
-    RiskPolicyManager: `hash-${deployHash().slice(0, 40)}`,
-    DisputeCourt: `hash-${deployHash().slice(0, 40)}`,
-    SlashingVault: `hash-${deployHash().slice(0, 40)}`,
-    Governance: `hash-${deployHash().slice(0, 40)}`,
-    AddressBindingRegistry: `hash-${deployHash().slice(0, 40)}`,
-    ExternalReceiptRegistry: `hash-${deployHash().slice(0, 40)}`,
-    GlobalExposureManager: `hash-${deployHash().slice(0, 40)}`,
-    CreditAuthorizationNotes: `hash-${deployHash().slice(0, 40)}`,
-    UpgradeManager: `hash-${deployHash().slice(0, 40)}`,
-    FiatReceiptRegistry: `hash-${deployHash().slice(0, 40)}`,
-    OperatorVerificationRegistry: `hash-${deployHash().slice(0, 40)}`,
-    RealFiAttestationRegistry: `hash-${deployHash().slice(0, 40)}`,
-  };
+  /**
+   * Contract package hashes. Installed contracts carry their REAL Casper Testnet
+   * hash (verifiable on cspr.live); simulation-only contracts carry a clearly
+   * labeled `sim-*` identifier. See {@link contractProvenance} for per-contract
+   * install status and explorer links.
+   */
+  readonly contractHashes: Record<string, string> = buildContractHashes();
+
+  /**
+   * Honest provenance for {@link contractHashes}: which contracts are really
+   * installed on Casper Testnet vs. simulated in-memory, plus explorer links.
+   * The running credit state is an in-memory simulation (`ledger_mode`).
+   */
+  readonly contractProvenance: ContractProvenance = buildContractProvenance();
 
   /** Build an agent's read-optimized public passport (p2 §6.2). */
   buildPassport(agent_id: string): AgentPassport | undefined {
@@ -196,6 +189,8 @@ export class Ledger {
   snapshot() {
     return {
       contractHashes: this.contractHashes,
+      contractProvenance: this.contractProvenance,
+      ledgerMode: this.contractProvenance.ledger_mode,
       policyVersion: this.policy.version(),
       agents: this.agents.list(),
       receipts: this.receipts.list(),
