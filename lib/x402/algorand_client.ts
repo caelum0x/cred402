@@ -1,6 +1,4 @@
 import {
-  ALGORAND_MAINNET_CAIP2,
-  ALGORAND_TESTNET_CAIP2,
   USDC_MAINNET_ASA_ID,
   USDC_TESTNET_ASA_ID,
   isValidAlgorandAddress,
@@ -9,6 +7,7 @@ import { decodePaymentRequiredHeader } from "@x402/core/http";
 import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
 import { validateDiscoveryExtensionSpec } from "@x402/extensions/bazaar";
 import { X402_CHALLENGE_TAG } from "./challenge_tag.js";
+import { algorandNetworkIdFor } from "./algorand_networks.js";
 
 export type AlgorandClientNetwork = "testnet" | "mainnet";
 
@@ -31,7 +30,7 @@ export interface AlgorandChallengeInspection {
 }
 
 export function networkIdFor(name: AlgorandClientNetwork) {
-  return name === "mainnet" ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2;
+  return algorandNetworkIdFor(name);
 }
 
 export function usdcAssetFor(name: AlgorandClientNetwork) {

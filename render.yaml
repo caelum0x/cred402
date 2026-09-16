@@ -50,6 +50,13 @@ services:
       # Putting the acknowledgement in source would defeat the gate it exists to be.
       - key: CRED402_ALGORAND_MAINNET_RELEASE_ACK
         sync: false
+      # CRED402_ENV=mainnet turns auth on and demands a webhook secret. Without BOTH of
+      # these loadConfig throws at import time and the service crash-loops before it
+      # ever binds a port -- it does not degrade to a 503. Set them in the dashboard.
+      - key: CRED402_ADMIN_API_KEY
+        sync: false
+      - key: CRED402_WEBHOOK_SECRET
+        sync: false
       - key: CRED402_ALGORAND_NETWORK
         value: mainnet
       # Must match the network or the paid path refuses to enable.

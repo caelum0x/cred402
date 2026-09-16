@@ -14,11 +14,13 @@ import {
   encodePaymentSignatureHeader,
 } from "@x402/core/http";
 import {
-  ALGORAND_MAINNET_CAIP2,
-  ALGORAND_TESTNET_CAIP2,
   USDC_MAINNET_ASA_ID,
   USDC_TESTNET_ASA_ID,
 } from "@x402/avm";
+import {
+  ALGORAND_MAINNET_NETWORK,
+  ALGORAND_TESTNET_NETWORK,
+} from "../lib/x402/algorand_networks.js";
 import { validateDiscoveryExtensionSpec } from "@x402/extensions/bazaar";
 import {
   ALGORAND_CREDIT_SCORE_ROUTE,
@@ -50,7 +52,7 @@ class FakeFacilitator implements FacilitatorClient {
   verifyCalls = 0;
   settleCalls = 0;
 
-  constructor(private readonly network: typeof ALGORAND_TESTNET_CAIP2 | typeof ALGORAND_MAINNET_CAIP2) {}
+  constructor(private readonly network: typeof ALGORAND_TESTNET_NETWORK | typeof ALGORAND_MAINNET_NETWORK) {}
 
   async getSupported(): Promise<SupportedResponse> {
     this.supportedCalls++;
@@ -165,11 +167,11 @@ test("Algorand production config pins safe HTTPS origins and bounded facilitator
 
 test("Algorand config selects the correct CAIP-2 network and USDC ASA", () => {
   const testnet = config("testnet");
-  assert.equal(testnet.network, ALGORAND_TESTNET_CAIP2);
+  assert.equal(testnet.network, ALGORAND_TESTNET_NETWORK);
   assert.equal(testnet.usdcAsset, USDC_TESTNET_ASA_ID);
 
   const mainnet = config("mainnet");
-  assert.equal(mainnet.network, ALGORAND_MAINNET_CAIP2);
+  assert.equal(mainnet.network, ALGORAND_MAINNET_NETWORK);
   assert.equal(mainnet.usdcAsset, USDC_MAINNET_ASA_ID);
 });
 
@@ -189,7 +191,7 @@ test("public deployment status exposes complete configuration without secrets", 
   });
   const status = describeAlgorandX402(loaded);
   assert.equal(status.configured, true);
-  assert.equal(status.network, ALGORAND_MAINNET_CAIP2);
+  assert.equal(status.network, ALGORAND_MAINNET_NETWORK);
   assert.equal(status.usdc_asset, USDC_MAINNET_ASA_ID);
   assert.equal(status.pay_to, VALID_ADDRESS);
   assert.equal(status.public_origin, "https://cred402.example");
@@ -221,7 +223,7 @@ test("unpaid credit-score request returns x402 v2 + Algorand USDC + Bazaar metad
   assert.ok(encoded);
   const paymentRequired = decodePaymentRequiredHeader(encoded!);
   assert.equal(paymentRequired.x402Version, 2);
-  assert.equal(paymentRequired.accepts[0]!.network, ALGORAND_TESTNET_CAIP2);
+  assert.equal(paymentRequired.accepts[0]!.network, ALGORAND_TESTNET_NETWORK);
   assert.equal(paymentRequired.accepts[0]!.asset, USDC_TESTNET_ASA_ID);
   assert.equal(paymentRequired.accepts[0]!.amount, "10000");
   assert.equal(paymentRequired.accepts[0]!.payTo, VALID_ADDRESS);
@@ -285,7 +287,7 @@ test("unpaid credit-score request returns x402 v2 + Algorand USDC + Bazaar metad
 test("payment selector fails closed on changed receiver, price, or alternatives", () => {
   const requirement: PaymentRequirements = {
     scheme: "exact",
-    network: ALGORAND_TESTNET_CAIP2,
+    network: ALGORAND_TESTNET_NETWORK,
     asset: USDC_TESTNET_ASA_ID,
     amount: "10000",
     payTo: VALID_ADDRESS,

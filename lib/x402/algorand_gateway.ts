@@ -9,8 +9,6 @@ import {
   type ProcessSettleResultResponse,
 } from "@x402/core/server";
 import {
-  ALGORAND_MAINNET_CAIP2,
-  ALGORAND_TESTNET_CAIP2,
   USDC_MAINNET_ASA_ID,
   USDC_TESTNET_ASA_ID,
   isValidAlgorandAddress,
@@ -22,6 +20,12 @@ import {
   withBazaar,
 } from "@x402/extensions/bazaar";
 import { X402_CHALLENGE_TAG } from "./challenge_tag.js";
+import {
+  ALGORAND_MAINNET_NETWORK,
+  ALGORAND_TESTNET_NETWORK,
+  algorandNetworkNameFor,
+  type AlgorandNetworkId,
+} from "./algorand_networks.js";
 
 export const ALGORAND_CREDIT_SCORE_ROUTE = "/v1/x402/credit-score/:agentId";
 export const ALGORAND_X402_STATUS_ROUTE = "/v1/x402/algorand/status";
@@ -81,7 +85,7 @@ export interface AlgorandX402Config {
   releaseTier: "development" | "testnet" | "mainnet";
   payTo: string;
   networkName: AlgorandNetworkName;
-  network: typeof ALGORAND_TESTNET_CAIP2 | typeof ALGORAND_MAINNET_CAIP2;
+  network: AlgorandNetworkId;
   usdcAsset: typeof USDC_TESTNET_ASA_ID | typeof USDC_MAINNET_ASA_ID;
   priceMicroUsdc: string;
   facilitatorUrl: string;
@@ -183,13 +187,11 @@ export function loadAlgorandX402Config(
   }
 
   const rawNetwork = (env.CRED402_ALGORAND_NETWORK ?? "testnet").trim();
-  let networkName: AlgorandNetworkName;
-  if (rawNetwork === "testnet" || rawNetwork === ALGORAND_TESTNET_CAIP2) networkName = "testnet";
-  else if (rawNetwork === "mainnet" || rawNetwork === ALGORAND_MAINNET_CAIP2) networkName = "mainnet";
-  else {
+  const networkName = algorandNetworkNameFor(rawNetwork);
+  if (!networkName) {
     return {
       enabled: false,
-      reason: "CRED402_ALGORAND_NETWORK must be testnet, mainnet, or a supported Algorand CAIP-2 id",
+      reason: "CRED402_ALGORAND_NETWORK must be testnet, mainnet, or a supported Algorand network id",
     };
   }
 
@@ -324,7 +326,7 @@ export function loadAlgorandX402Config(
       releaseTier: releaseTier as "development" | "testnet" | "mainnet",
       payTo,
       networkName,
-      network: mainnet ? ALGORAND_MAINNET_CAIP2 : ALGORAND_TESTNET_CAIP2,
+      network: mainnet ? ALGORAND_MAINNET_NETWORK : ALGORAND_TESTNET_NETWORK,
       usdcAsset: mainnet ? USDC_MAINNET_ASA_ID : USDC_TESTNET_ASA_ID,
       priceMicroUsdc,
       facilitatorUrl,

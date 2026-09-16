@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { PaymentRequired, PaymentRequirements } from "@x402/core/types";
-import { ALGORAND_MAINNET_CAIP2, USDC_MAINNET_ASA_ID } from "@x402/avm";
+import { USDC_MAINNET_ASA_ID } from "@x402/avm";
+import { ALGORAND_MAINNET_NETWORK } from "../lib/x402/algorand_networks.js";
 import type { AlgorandX402PublicStatus } from "../lib/x402/algorand_gateway.js";
 import type { AlgorandChallengeInspection } from "../lib/x402/algorand_client.js";
 import {
@@ -32,7 +33,7 @@ function snapshot(address: string): AlgorandAccountSnapshot {
 function fixture() {
   const selected: PaymentRequirements = {
     scheme: "exact",
-    network: ALGORAND_MAINNET_CAIP2,
+    network: ALGORAND_MAINNET_NETWORK,
     asset: USDC_MAINNET_ASA_ID,
     amount: "10000",
     payTo: RECEIVER,
@@ -57,7 +58,7 @@ function fixture() {
     configured: true,
     protocol: "x402-v2",
     paid_route: "/v1/x402/credit-score/:agentId",
-    network: ALGORAND_MAINNET_CAIP2,
+    network: ALGORAND_MAINNET_NETWORK,
     network_name: "mainnet",
     usdc_asset: USDC_MAINNET_ASA_ID,
     price_micro_usdc: "10000",
