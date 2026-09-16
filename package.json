@@ -58,7 +58,8 @@
     "x402:algorand:release-check": "tsx scripts/algorand_x402_release_check.ts",
     "x402:algorand:pay": "tsx scripts/algorand_x402_pay.ts",
     "x402:algorand:refunds": "tsx scripts/algorand_x402_refunds.ts",
-    "x402:algorand:challenge-check": "tsx scripts/algorand_x402_challenge_check.ts"
+    "x402:algorand:challenge-check": "tsx scripts/algorand_x402_challenge_check.ts",
+    "record:algorand": "node scripts/record_algorand_x402_demo.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
