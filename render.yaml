@@ -11,31 +11,34 @@ services:
     name: cred402
     runtime: node
     region: oregon
-    # NOT free: Mainnet needs a persistent disk, and Render only attaches disks to
-    # paid instance types. The free tier also sleeps, which would drop paid traffic
-    # during the challenge's live-measurement window. Applying this blueprint starts
-    # billing the starter instance.
-    plan: starter
+    # Free tier, deliberately, with eyes open. Mainnet only requires CRED402_DATA_DIR
+    # to be set, not to be a mounted disk, so the paid path does enable here -- and
+    # the facilitator (not this service) is the system of record for settlements, so
+    # Bazaar listing, settle counts and leaderboard standing survive a restart.
+    #
+    # What the free tier costs us, accepted:
+    #   * the x402 replay barrier lives on the ephemeral filesystem, so a restart
+    #     clears it and a previously-spent payment proof could be replayed once more
+    #     (bounded: one free report per replayed proof, at 0.01 USDC each);
+    #   * /v1/x402/algorand/usage and the finalized receipt projection reset to empty
+    #     on every restart, so local history understates real volume;
+    #   * the instance sleeps, and a cold start can be slow enough that a buyer's
+    #     paid request times out -- which costs real challenge volume, not eligibility.
+    #
+    # Upgrading to a paid plan and attaching a disk at /var/data fixes all three.
+    plan: free
     # tsx + typescript live in devDependencies, so install them too (Render sets
     # NODE_ENV=production, which would otherwise skip dev deps).
     buildCommand: npm install --include=dev
     startCommand: npm start
     healthCheckPath: /v1/health
     autoDeploy: true
-    # The x402 payment-replay barrier, the durable receipt proofs, and the ledger
-    # journal all live under CRED402_DATA_DIR. On the ephemeral container filesystem
-    # a restart would erase the replay barrier, so loadAlgorandX402Config refuses to
-    # enable the paid path on Mainnet without a data dir. This is that disk.
-    disk:
-      name: cred402-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # The API already honors the platform PORT; pin the journal to the mounted disk.
+      # Satisfies the Mainnet durability gate. Ephemeral on free -- see the note above.
       - key: CRED402_DATA_DIR
-        value: /var/data
+        value: /tmp/cred402
       # Algorand x402 is fail-closed until the receiver is entered in the Render
       # dashboard. Render ignores new sync:false values on an existing Blueprint, so
       # operators must confirm this variable manually. Once set on Mainnet, keep it

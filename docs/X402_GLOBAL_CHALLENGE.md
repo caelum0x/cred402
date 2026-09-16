@@ -93,11 +93,25 @@ export const CRED402_MERCHANT_IDENTITY = {
 ## Activation (owner-gated)
 
 [`render.yaml`](../render.yaml) now carries the full Mainnet configuration: the
-`mainnet` network/env pair, the Mainnet indexer, the pinned HTTPS public origin, and a
-1GB disk mounted at `/var/data` with `CRED402_DATA_DIR` pointed at it. Applying the
-blueprint moves the service to a **paid starter instance** — Render only attaches
-persistent disks to paid plans, and the free tier sleeps, which would drop paid traffic
-during the October measurement window.
+`mainnet` network/env pair, the Mainnet indexer, the pinned HTTPS public origin, and
+`CRED402_DATA_DIR`.
+
+It stays on the **free plan**, deliberately. Mainnet only requires `CRED402_DATA_DIR` to
+be set, not to be a mounted disk, and the facilitator — not this service — is the system
+of record for settlements, so Bazaar listing, settle counts and leaderboard standing
+survive a restart. The accepted costs are that the replay barrier lives on the ephemeral
+filesystem (a restart lets one spent proof replay once more, worth 0.01 USDC), that the
+local usage projection resets on restart, and that cold starts can be slow enough to time
+out a buyer's paid request — which costs volume, not eligibility. Attaching a disk at
+`/var/data` on a paid plan fixes all three.
+
+**Receiver address** (generated 2026-09-16, unfunded until activated):
+
+```
+M2MIOWWWAS2VKUNGOETPMBSCVLBRDRZ3NPGH3IB3U5BECX6YWPGGPQIUGY
+```
+
+Fund with ~0.3 ALGO and opt into USDC ASA `31566704` before setting it.
 
 Two values are deliberately `sync: false` and must be typed into the Render dashboard:
 

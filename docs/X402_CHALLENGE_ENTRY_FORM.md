@@ -90,9 +90,24 @@ Solo. **CONFIRM** the background line — this is a placeholder you should make 
 ## Blocked until the endpoint is live
 
 **Leaderboard wallet** — the `payTo` address the Foundation uses to match on-chain
-volume. This is `CRED402_ALGORAND_PAY_TO`. It does not exist yet, and it must be the
-*same* address that settles the real payment, because rankings key on it. See
-[activation](./X402_GLOBAL_CHALLENGE.md#activation-owner-gated).
+volume. This is `CRED402_ALGORAND_PAY_TO`:
+
+```
+M2MIOWWWAS2VKUNGOETPMBSCVLBRDRZ3NPGH3IB3U5BECX6YWPGGPQIUGY
+```
+
+Generated 2026-09-16. Valid on Mainnet, currently **unfunded and not opted into USDC**, so
+it cannot receive a payment yet. Do not put it in the form until it has settled the real
+payment — rankings key on this address, and it has to be the same one throughout.
+
+To activate it: fund with **~0.3 ALGO** (0.1 base min-balance, +0.1 for the USDC ASA
+opt-in, plus fees), opt into ASA `31566704`, then set it as `CRED402_ALGORAND_PAY_TO` in
+the Render dashboard. Verify read-only with:
+
+```bash
+CRED402_ALGORAND_CLIENT_ADDRESS=<payer address> \
+  npm run x402:algorand:ready -- "https://cred402-1.onrender.com/v1/x402/credit-score/$CRED402_AGENT_ID"
+```
 
 **Demo video (3–5 minutes)** — must show the project, its key features, and how it uses
 x402 and Algorand. The existing `media/cred402-demo.mp4` and
