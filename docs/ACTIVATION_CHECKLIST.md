@@ -17,6 +17,15 @@ This checklist is the exact set of environment variables the owner must set (in 
 service and mirrored in `.env`) to flip the probe to `configured:true`. Setting them is
 owner-gated; nothing here deploys on its own.
 
+**Known duplicate service (owner-gated cleanup):** the Render account currently has two
+live services — the canonical one from this repo's [`render.yaml`](../render.yaml), reachable
+at `https://cred402-1.onrender.com` (used by every doc, script, and the Vercel rewrites in
+this repo), and a second, older zombie deploy at `https://cred402.onrender.com` (no `-1`)
+still serving a stale pre-Algorand build (Casper-simulation `/api/state`, no `/v1/health` or
+`/v1/x402/*` routes). There is no Render API token in this environment to delete it via API;
+delete or suspend `cred402.onrender.com` from the Render dashboard to stop it answering
+stale responses under a confusingly similar hostname.
+
 ---
 
 ## 1. Required to turn the paid endpoint ON (testnet)

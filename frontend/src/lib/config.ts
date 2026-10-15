@@ -6,7 +6,9 @@
  * the live event streams connect straight to the API (which sets permissive CORS),
  * while plain REST keeps using the same-origin Vercel rewrites.
  *
- * Set VITE_API_BASE=https://cred402.onrender.com in the Vercel project env.
+ * Set VITE_API_BASE=https://cred402-1.onrender.com in the Vercel project env.
+ * (cred402.onrender.com, without the -1, is a stale duplicate Render service
+ * running an old pre-Algorand build — do not point the console at it.)
  * Empty in local dev → same-origin relative URLs (the local API / Vite proxy).
  */
 export const API_BASE: string = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
