@@ -105,9 +105,14 @@ export class AgentCreditPool {
     this.state.total_liquidity += interestPaid; // interest compounds into the pool
 
     if (line.drawn === 0n && line.status === "active") {
-      // reset the term window after full repayment
-      line.opened_at = this.clock.now();
-      line.due_timestamp = this.clock.now() + (line.due_timestamp - line.opened_at);
+      // reset the term window after full repayment to a fresh full-length term.
+      // Capture the original term length before overwriting opened_at — using
+      // the already-updated opened_at here would shrink the new term by
+      // however much of the old term had already elapsed.
+      const termSeconds = line.due_timestamp - line.opened_at;
+      const now = this.clock.now();
+      line.opened_at = now;
+      line.due_timestamp = now + termSeconds;
     }
     this.bus.emit("CreditRepaid", CONTRACT, deployHash(), {
       agent_id,
