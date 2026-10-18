@@ -206,7 +206,105 @@ Verify on Blockscout: `https://coston2-explorer.flare.network` (`--verifier bloc
 
 ---
 
-## 3. Reproduce everything
+## 3. QIE Hackathon 3.0
+
+**Submission deadline: 2026-11-30** (demo week Dec 1-5, winners announced Dec 10, 2026).
+Sourced directly from `hackathon.qie.digital` (home + dashboard pages), corroborated by
+Decrypt/BeInCrypto/CryptoDaily/CryptoSlate press coverage of "QIE Blockchain Hackathon 3.0".
+**Caveat:** the dashboard's `/dashboard/categories` sub-page returned a JS-shell with no
+extractable text on fetch, so the 5-track category list below is corroborated from the home
+page and press coverage, not scraped directly off that sub-page — treat the deadline and track
+list as well-corroborated but not independently primary-sourced beyond the home page.
+
+Cred402 is targeting the **AI & Autonomous Agents** track (one of 5: DeFi & Financial
+Infrastructure, AI & Autonomous Agents, Consumer Applications & Social, Commerce &
+Real-World Payments, Developer Infrastructure & Tooling). Required at submission: GitHub
+repo link, live demo URL, a deployed contract address **on QIE Mainnet** (chain 1990 — build
+and test on Testnet, chain 1983, but mainnet deployment is the submission requirement, not
+testnet), and the chosen track. Prize pool $17,000 total, 50%-now / 50%-after-90-days-traction
+payout.
+
+### Submission checklist
+
+| Requirement | Value |
+|---|---|
+| **GitHub source** | https://github.com/caelum0x/cred402 |
+| **Track selection** | AI & Autonomous Agents |
+| **Demo video** | **TODO** — record once a real facilitator + QUSDC contract are configured (see [Produce the required submission artifacts](#produce-the-required-submission-artifacts)) |
+| **Live demo URL** | `GET /v1/x402/qie/credit-score/:agentId` on https://cred402-1.onrender.com is live code today, but returns `503` until an operator sets `CRED402_QIE_PAY_TO` / `CRED402_QIE_ASSET_ADDRESS` / `CRED402_QIE_FACILITATOR_URL` on that deployment — see [below](#what-was-newly-built-vs-whats-todo) |
+| **Deployed contract address on QIE Mainnet** | **TODO** — not deployed; see [Mainnet release checklist](qie_x402.md#mainnet-release-checklist) in the QIE integration doc |
+| **A real testnet/mainnet transaction** | **TODO** — needs a funded QIE faucet key, a confirmed QUSDC contract, and a running x402 EVM facilitator for QIE; none of the three is confirmed to exist yet (see below) |
+
+### What it is
+
+Cred402's QIE integration follows the same shape as every other chain integration in this
+repo: it sells one resource, the agent credit score, over x402, and keeps the scoring and
+risk logic shared with the rest of the protocol. QIE is EVM-compatible (a Cosmos-SDK chain
+with standard `eth_*` JSON-RPC, the same general shape as Flare), so the integration is meant
+to extend Cred402's generic EVM x402 primitives rather than duplicate Algorand's bespoke
+non-EVM indexer/ASA logic. Full write-up, configuration, and the honest list of what's
+unverified: [`qie_x402.md`](qie_x402.md).
+
+### What was newly built vs. what's TODO
+
+- **Shipped, real code (not a stub):** `GET /v1/x402/qie/credit-score/:agentId`
+  (`api/qie_x402_routes.ts`) and `GET /v1/x402/qie/status`, backed by
+  `lib/x402/qie_gateway.ts` (the `@x402/core` + `@x402/evm` `ExactEvmScheme` resource server —
+  the same chain-agnostic plumbing the Algorand route uses), `lib/x402/qie_networks.ts`
+  (`eip155:1983` / `eip155:1990`), `lib/x402/qie_rpc.ts` + `qie_finality.ts` (independent
+  on-chain settlement confirmation via QIE's own RPC — no Indexer-equivalent is confirmed to
+  exist for QIE, so Cred402 reads the transaction receipt and ERC-20 `Transfer` log itself),
+  and `lib/x402/qie_payment_attempt_store.ts` (durable exact-once replay, mirroring
+  `AlgorandPaymentAttemptStore`). `npm run x402:qie:check` is the live, read-only preflight
+  script (`scripts/qie_x402_check.ts` + `lib/x402/qie_client.ts`). 9 new tests
+  (`test/qie_x402.test.ts`) cover config fail-closing, the unpaid challenge shape, the client
+  selector, the attempt store, and both finality outcomes; `npm test` and `npm run typecheck`
+  are green with this code in the tree. Full write-up: [`qie_x402.md`](qie_x402.md).
+- **Deliberately fails closed, not invented:** `CRED402_QIE_ASSET_ADDRESS` (QUSDC's ERC-20
+  contract address on QIE could not be independently confirmed by research — the route
+  returns `503` rather than guessing one) and `CRED402_QIE_FACILITATOR_URL` (no default x402
+  EVM facilitator for QIE is confirmed to exist — an operator must point this at a self-hosted
+  or third-party one). Both are required env vars with no default; `CRED402_QIE_PAY_TO` is
+  required the same way `CRED402_ALGORAND_PAY_TO` is. See
+  [What research could not confirm](qie_x402.md#what-research-could-not-confirm-and-how-the-code-fails-closed-instead)
+  in the integration doc.
+- **Not yet built (tracked, not hidden):** Casper-anchoring of QIE settlements (the Algorand
+  route anchors a receipt proof to Casper; QIE's is durable locally but not yet anchored), and
+  the balance-readiness / signed-evidence release-check scripts that Algorand has
+  (`x402:algorand:ready`, `x402:algorand:release-check`) — add these once a real facilitator
+  and the QUSDC contract address are confirmed and testable end-to-end. See
+  [Known gaps](qie_x402.md#known-gaps-vs-the-algorand-integration-tracked-not-hidden).
+- **TODO (needs owner-held keys/accounts, not code):** a deployed contract address on QIE
+  Mainnet, a real testnet or mainnet transaction, a demo video, and a live demo URL with the
+  env vars above actually set on the production deployment.
+
+### Produce the required submission artifacts
+
+The adapter code is done; what remains needs a real key, a confirmed QUSDC contract, and a
+running facilitator — none of which can be faked:
+
+```bash
+# 1. Fund a testnet QIE key from the faucet (testnet QIE only, never asks for a seed phrase):
+#    https://www.qie.digital/faucet
+# 2. Confirm (or deploy, for local development) a QUSDC/test ERC-20 contract address on QIE
+#    testnet, and stand up or point at an x402 EVM facilitator that settles "exact" payments
+#    on eip155:1983. Then run the live, read-only preflight check (never signs or pays):
+export CRED402_QIE_EXPECTED_PAY_TO=0x...
+export CRED402_QIE_EXPECTED_ASSET_ADDRESS=0x...
+npm run x402:qie:check -- "https://staging.example.com/v1/x402/qie/credit-score/$CRED402_AGENT_ID"
+
+# 3. Before the Nov 30, 2026 deadline, deploy to QIE Mainnet (chain 1990) and record the
+#    contract address and a real transaction hash in docs/qie_x402.md's release checklist.
+```
+
+Without a key, there is no sim fallback documented for this one the way `npm run
+submit:check` has one for KeeperHub × Flare — the QIE submission's required artifacts
+(live demo URL, deployed mainnet contract, transaction) are inherently real-network
+deliverables, not something a deterministic sim can stand in for at submission time.
+
+---
+
+## 4. Reproduce everything
 
 Every flow runs sim-by-default (no keys, no network). Real integrations activate behind env
 vars (see [What's real vs sim](#4-whats-real-vs-sim)).
@@ -228,7 +326,7 @@ vars (see [What's real vs sim](#4-whats-real-vs-sim)).
 
 ---
 
-## 4. What's real vs sim
+## 5. What's real vs sim
 
 Cred402's convention is **real-behind-env + deterministic sim**: everything runs green in a
 deterministic simulation with **no keys** (so `npm test` → 346 pass on any machine and every

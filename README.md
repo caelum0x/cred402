@@ -86,6 +86,30 @@ not-found outcomes. Mainnet also requires persistent storage, aligned runtime an
 network tiers, pinned HTTPS endpoints, and a deliberate real-USDC release
 acknowledgement.
 
+## QIE Blockchain Hackathon 3.0
+
+Cred402 exposes a second chain-priced credit-score resource for QIE's
+"AI & Autonomous Agents" track (`hackathon.qie.digital`, build period through
+2026-11-30):
+
+```text
+GET /v1/x402/qie/credit-score/:agentId
+network: QIE Testnet (eip155:1983) or Mainnet (eip155:1990)
+scheme: x402 v2 exact (EIP-3009), via @x402/core + @x402/evm
+```
+
+QIE is EVM-compatible, so this reuses the same generic `@x402/core`
+resource-server plumbing the Algorand integration uses — only the registered
+scheme (`ExactEvmScheme`) and network differ. Configure
+`CRED402_QIE_PAY_TO`, `CRED402_QIE_ASSET_ADDRESS` (QIE's QUSDC stablecoin
+contract, once confirmed — no address is hardcoded), and
+`CRED402_QIE_FACILITATOR_URL` in [`.env.example`](.env.example); without them
+the route fails closed with `503`. `npm run x402:qie:check` verifies the live
+unpaid challenge without signing or paying anything. See
+[the integration guide](docs/qie_x402.md) for configuration, independent
+on-chain finality via QIE's own RPC, and the documented gaps vs. the
+Algorand integration.
+
 ## Live deployment
 
 | Surface | URL | Stack |
@@ -152,7 +176,7 @@ Cred402 ships real integrations behind environment flags — with sim / free-API
 | Rail | Real integration |
 | ---- | ---------------- |
 | **Casper Testnet** | Byte-exact Casper 2.0 deploys + WASM install via `casper-js-sdk`; live node reads (`node.testnet.casper.network`). `CRED402_CHAIN=sim\|testnet`. |
-| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). A **Credit-Service Marketplace** sells Cred402's intelligence pay-per-call over `/x402/services/:id`. The Algorand route `/v1/x402/credit-score/:agentId` uses official `@x402/core` + `@x402/avm`, GoPlausible settlement, USDC, and Bazaar discovery. |
+| **x402 payments** | Real `402 → sign → 200` flow with **EIP-712 typed-data digests** (`@casper-ecosystem/casper-eip-712`); optional `make-software/casper-x402` facilitator settlement (x402 V2). A **Credit-Service Marketplace** sells Cred402's intelligence pay-per-call over `/x402/services/:id`. The Algorand route `/v1/x402/credit-score/:agentId` uses official `@x402/core` + `@x402/avm`, GoPlausible settlement, USDC, and Bazaar discovery. The QIE route `/v1/x402/qie/credit-score/:agentId` uses `@x402/core` + `@x402/evm` (`eip155:1983`/`1990`), a configured EVM facilitator, and independent RPC-based settlement finality — fails closed (`503`) until its asset contract and facilitator are configured. |
 | **RWA data** | Live solar GHI from **Open-Meteo** (free, no key) + a real PV physics model — never random mock data. |
 | **MCP** | 78-tool server over both a zero-dep stdio transport and the official `@modelcontextprotocol/sdk` (Claude Desktop / MCP Inspector) — incl. the KeeperHub, Flare, keeper, automations, collateral, marketplace, FAssets + scheduler tools. |
 | **Event feed** | `casper-network/casper-sidecar` SSE `/events` client (faithful framing, contract-message extraction). |

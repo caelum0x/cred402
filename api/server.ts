@@ -3,6 +3,7 @@ import { getState } from "./state.js";
 import { json, readBody, readRawBody, serveStatic } from "./http_utils.js";
 import { handlePaidEvidence } from "./paid_evidence_server/index.js";
 import { handleAlgorandX402, startAlgorandReconciliation } from "./algorand_x402_routes.js";
+import { handleQieX402 } from "./qie_x402_routes.js";
 import { Gateway, loadConfig, toApiError } from "../lib/gateway/index.js";
 import { V1Router } from "./v1/router.js";
 import { executeGraphQL, introspectionQuery } from "../lib/graphql/index.js";
@@ -103,6 +104,11 @@ const server = createServer(async (req, res) => {
     // receipt proofs, paid credit score) — must run before the generic v1
     // router. Extracted to api/algorand_x402_routes.ts; order preserved.
     if (await handleAlgorandX402(req, res, state, url, { gateway, port: PORT })) return;
+
+    // ---- QIE x402 payment domain (status, paid credit score) — same
+    // ordering contract as the Algorand handler above, extracted to
+    // api/qie_x402_routes.ts.
+    if (await handleQieX402(req, res, state, url, { gateway, port: PORT })) return;
 
     // ---- production versioned API (auth + rate limit + validation + envelope) ----
     if (pathname === "/v1" || pathname.startsWith("/v1/")) {
