@@ -132,11 +132,17 @@ facilitator — it mirrors `/v1/x402/algorand/status`.
 
 ## Known gaps vs. the Algorand integration (tracked, not hidden)
 
-- No Casper anchoring of QIE settlements yet (the Algorand route anchors a
-  content-addressed external receipt proof to Casper via
-  `state.anchorAlgorandCreditScoreSettlement`; QIE settlements are durable in
-  the local attempt store but not yet anchored). Candidate follow-up: extract
-  a chain-agnostic version of that anchoring path.
+- ~~No Casper anchoring of QIE settlements yet~~ **Built.** `api/qie_receipt_anchor.ts`
+  mirrors `algorand_receipt_anchor.ts`: `state.anchorQieCreditScoreSettlement`
+  turns a settled QIE payment into the same Casper-rooted Universal Receipt
+  Envelope every other satellite chain uses (`qie:<payer>` identity,
+  `qie-erc20:<contract>` asset), anchored provisional until
+  `reconcileQiePayment`'s RPC finality check confirms it, then finalized or
+  challenged. The credit-score response carries `external_receipt_id` /
+  `external_receipt_url` / `casper_anchor_status`; the proof is public at
+  `GET /v1/x402/external-receipts/:id` (the same endpoint Algorand's receipts
+  use — receipt ids are a shared content hash, not chain-specific). Covered
+  by `test/qie_receipt_anchor.test.ts` (6 tests, against a real `Ledger`).
 - No combined release-check / readiness script yet (Algorand has
   `x402:algorand:ready` and `x402:algorand:release-check`, which fetch live
   payer/receiver balances and write a signed evidence artifact). QIE has the

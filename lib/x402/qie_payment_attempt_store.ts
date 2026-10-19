@@ -26,6 +26,7 @@ export interface StoredQieSettlement {
   payer?: string;
   receiver: string;
   transaction?: string; // 0x tx hash
+  externalReceiptId?: string;
   responseHeaders: Record<string, string>;
   resourceResponse: unknown;
 }

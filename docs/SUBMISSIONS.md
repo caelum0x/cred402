@@ -260,6 +260,23 @@ unverified: [`qie_x402.md`](qie_x402.md).
   (`test/qie_x402.test.ts`) cover config fail-closing, the unpaid challenge shape, the client
   selector, the attempt store, and both finality outcomes; `npm test` and `npm run typecheck`
   are green with this code in the tree. Full write-up: [`qie_x402.md`](qie_x402.md).
+- **Casper-anchoring: now built.** `api/qie_receipt_anchor.ts` mirrors
+  `algorand_receipt_anchor.ts` exactly — a settled QIE payment becomes the same
+  Casper-rooted Universal Receipt Envelope used by every other satellite chain
+  (`qie:<payer>` identity, `qie-erc20:<contract>` asset id), anchored provisional
+  (`finalize: false`) until `reconcileQiePayment`'s RPC check confirms it, then
+  finalized or challenged exactly like the Algorand path. Wired into
+  `api/state.ts` (`anchorQieCreditScoreSettlement` /
+  `finalizeQieExternalReceipt` / `challengeQieExternalReceipt` /
+  `qieX402Usage`) and `api/qie_x402_routes.ts` (the credit-score response now
+  carries `external_receipt_id`, `external_receipt_url`, and
+  `casper_anchor_status`, served through the same
+  `/v1/x402/external-receipts/:id` endpoint Algorand uses — receipt ids are a
+  shared, chain-agnostic content hash). 6 new unit tests
+  (`test/qie_receipt_anchor.test.ts`) exercise the anchor function directly
+  against a real `Ledger` (idempotent replay, conflicting-replay rejection,
+  finalize/challenge transitions, and usage aggregation); `npm test` (408/408)
+  and `npm run typecheck` stay green.
 - **Deliberately fails closed, not invented:** `CRED402_QIE_ASSET_ADDRESS` (QUSDC's ERC-20
   contract address on QIE could not be independently confirmed by research — the route
   returns `503` rather than guessing one) and `CRED402_QIE_FACILITATOR_URL` (no default x402

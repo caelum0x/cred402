@@ -36,13 +36,16 @@ const qiePaymentAttempts = new QiePaymentAttemptStore(
   qieX402Config.enabled ? process.env.CRED402_DATA_DIR?.trim() : undefined,
 );
 
-async function reconcileQiePayment(paymentProofHash: string) {
+async function reconcileQiePayment(state: State, paymentProofHash: string) {
   const attempt = qiePaymentAttempts.getByProofHash(paymentProofHash);
   if (!attempt?.settlement || !qieX402Config.enabled) return attempt;
   if (attempt.finality?.status === "confirmed" || attempt.finality?.status === "mismatch") return attempt;
 
   const { settlement } = attempt;
   if (!settlement.transaction) {
+    if (settlement.externalReceiptId) {
+      state.challengeQieExternalReceipt(settlement.externalReceiptId);
+    }
     return qiePaymentAttempts.recordFinality(paymentProofHash, {
       status: "mismatch",
       checkedAt: new Date().toISOString(),
@@ -63,16 +66,32 @@ async function reconcileQiePayment(paymentProofHash: string) {
       amountBaseUnits: settlement.amountBaseUnits,
     },
   );
-  return qiePaymentAttempts.recordFinality(paymentProofHash, result);
+  const updated = qiePaymentAttempts.recordFinality(paymentProofHash, result);
+  if (result.status === "confirmed" && settlement.externalReceiptId) {
+    state.finalizeQieExternalReceipt(settlement.externalReceiptId);
+  } else if (result.status === "mismatch" && settlement.externalReceiptId) {
+    state.challengeQieExternalReceipt(settlement.externalReceiptId);
+  }
+  return updated;
 }
 
-async function respondPaymentAttempt(res: ServerResponse, attemptId: string): Promise<void> {
+async function respondPaymentAttempt(
+  req: IncomingMessage,
+  res: ServerResponse,
+  state: State,
+  attemptId: string,
+  port: number,
+): Promise<void> {
   const attempt = qiePaymentAttempts.getByAttemptId(attemptId);
   if (!attempt) {
     json(res, 404, { error: "payment_attempt_not_found" }, { "Cache-Control": "no-store" });
     return;
   }
-  const reconciled = attempt.status === "settled" ? await reconcileQiePayment(attempt.paymentProofHash) : attempt;
+  const reconciled = attempt.status === "settled" ? await reconcileQiePayment(state, attempt.paymentProofHash) : attempt;
+  const origin = qieX402Config.enabled
+    ? qieX402Config.config.publicBaseUrl ?? `http://${req.headers.host ?? `localhost:${port}`}`
+    : `http://${req.headers.host ?? `localhost:${port}`}`;
+  const receiptId = reconciled?.settlement?.externalReceiptId;
   json(res, 200, {
     schema_version: "cred402.qie-payment-attempt.v1",
     attempt_id: reconciled?.attemptId,
@@ -86,6 +105,9 @@ async function respondPaymentAttempt(res: ServerResponse, attemptId: string): Pr
         }
       : null,
     transaction: reconciled?.settlement?.transaction ?? null,
+    external_receipt_url: receiptId
+      ? new URL(`/v1/x402/external-receipts/${encodeURIComponent(receiptId)}`, origin).href
+      : null,
     guidance: reconciled?.status === "indeterminate"
       ? "Do not submit another payment. Reconciliation against the configured QIE RPC is required."
       : undefined,
@@ -238,8 +260,11 @@ async function respondCreditScore(
     amount_base_units: amountBaseUnits,
     payer: settlement.payer,
     transaction: settlement.transaction,
+    external_receipt_id: null,
+    external_receipt_url: null,
     payment_attempt_url: paymentAttemptUrl(claim.attempt.attemptId),
     qie_finality: "pending",
+    casper_anchor_status: "not_recorded",
   };
   qiePaymentAttempts.settle(paymentProofHash, {
     network: settlement.network,
@@ -251,13 +276,47 @@ async function respondCreditScore(
     responseHeaders: settlement.headers,
     resourceResponse: { ...report, payment: basePayment },
   });
-  const reconciled = settlement.transaction ? await reconcileQiePayment(paymentProofHash) : undefined;
+  const anchoredReceipt = state.anchorQieCreditScoreSettlement({
+    agentId,
+    network: settlement.network,
+    networkName: qieX402Config.config.networkName,
+    assetAddress: qieX402Config.config.assetAddress,
+    amountBaseUnits,
+    payer: settlement.payer,
+    receiver: qieX402Config.config.payTo,
+    transaction: settlement.transaction,
+    report,
+  });
+  const externalReceiptUrl = anchoredReceipt
+    ? new URL(
+        `/v1/x402/external-receipts/${encodeURIComponent(anchoredReceipt.receipt_id)}`,
+        publicUrl,
+      ).href
+    : null;
+  qiePaymentAttempts.settle(paymentProofHash, {
+    network: settlement.network,
+    asset: qieX402Config.config.assetAddress,
+    amountBaseUnits,
+    payer: settlement.payer,
+    receiver: qieX402Config.config.payTo,
+    transaction: settlement.transaction,
+    externalReceiptId: anchoredReceipt?.receipt_id,
+    responseHeaders: settlement.headers,
+    resourceResponse: { ...report, payment: basePayment },
+  });
+  const reconciled = settlement.transaction ? await reconcileQiePayment(state, paymentProofHash) : undefined;
+  const receiptStatus = anchoredReceipt
+    ? state.externalReceiptProof(anchoredReceipt.receipt_id)?.status ?? "anchored"
+    : "not_recorded";
   const response = {
     ...report,
     payment: {
       ...basePayment,
+      external_receipt_id: anchoredReceipt?.receipt_id ?? null,
+      external_receipt_url: externalReceiptUrl,
       qie_finality: reconciled?.finality?.status ?? "unavailable",
       confirmations: reconciled?.finality?.confirmations ?? null,
+      casper_anchor_status: receiptStatus,
     },
   };
   qiePaymentAttempts.settle(paymentProofHash, {
@@ -267,6 +326,7 @@ async function respondCreditScore(
     payer: settlement.payer,
     receiver: qieX402Config.config.payTo,
     transaction: settlement.transaction,
+    externalReceiptId: anchoredReceipt?.receipt_id,
     responseHeaders: settlement.headers,
     resourceResponse: response,
   });
@@ -296,7 +356,7 @@ export async function handleQieX402(
 
   const qieAttemptMatch = pathname.match(/^\/v1\/x402\/qie\/payments\/(payqie_[0-9a-f]{32})$/);
   if (qieAttemptMatch && req.method === "GET") {
-    await respondPaymentAttempt(res, qieAttemptMatch[1]!);
+    await respondPaymentAttempt(req, res, state, qieAttemptMatch[1]!, port);
     return true;
   }
 

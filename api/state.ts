@@ -79,6 +79,14 @@ import {
   type AlgorandAnchorContext,
   type AlgorandCreditScoreSettlement,
 } from "./algorand_receipt_anchor.js";
+import {
+  anchorQieCreditScoreSettlement,
+  finalizeQieExternalReceipt,
+  challengeQieExternalReceipt,
+  qieX402Usage,
+  type QieAnchorContext,
+  type QieCreditScoreSettlement,
+} from "./qie_receipt_anchor.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -424,6 +432,37 @@ export class ServerState {
   /** Public, aggregate-only usage proof for the Algorand challenge endpoint. */
   algorandX402Usage(network: string, usdcAsset: string) {
     return algorandX402Usage(this.algorandAnchorContext(), network, usdcAsset);
+  }
+
+  /** Dependencies for the QIE x402 receipt-anchoring sub-domain, rebuilt
+   * fresh per call so the (reset-swappable) ledger + live seller id are current. */
+  private qieAnchorContext(): QieAnchorContext {
+    return {
+      ledger: this.ledger,
+      externalReceiptProofs: this.externalReceiptProofs,
+      sellerAgentId: this.economy.seller.agent_id,
+    };
+  }
+
+  /**
+   * Convert a successful QIE x402 credit-report payment into the same
+   * Casper-rooted Universal Receipt used by the other satellite chains.
+   */
+  anchorQieCreditScoreSettlement(input: QieCreditScoreSettlement): { receipt_id: string } | null {
+    return anchorQieCreditScoreSettlement(this.qieAnchorContext(), input);
+  }
+
+  finalizeQieExternalReceipt(receiptId: string): void {
+    finalizeQieExternalReceipt(this.qieAnchorContext(), receiptId);
+  }
+
+  challengeQieExternalReceipt(receiptId: string): void {
+    challengeQieExternalReceipt(this.qieAnchorContext(), receiptId);
+  }
+
+  /** Public, aggregate-only usage proof for the QIE challenge endpoint. */
+  qieX402Usage(network: string, assetAddress: string) {
+    return qieX402Usage(this.qieAnchorContext(), network, assetAddress);
   }
   /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
   dataCommons() {
