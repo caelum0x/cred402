@@ -29,18 +29,24 @@ credit_line    : 38.1 * 1.50 * 0.915 * 0.90 ≈ 47 CSPR
 Credit score (0..100) blends accuracy, reputation and (100 − dispute%). Interest is
 inversely mapped from score: ~8% APR for a top agent, ~22% APR for a weak one.
 
-## Service-category weighting (roadmap p1) — credit for the whole x402 economy
+## ~~Service-category weighting (roadmap p1)~~ — credit for the whole x402 economy
 
-Cred402 underwrites **any** x402 service, not just RWA. Every credit line is scaled
-by a `category_multiplier` from the agent's service category:
+**Built.** Cred402 underwrites **any** x402 service, not just RWA. Every credit
+line is scaled by a `category_multiplier` from the agent's service category, in
+both `policyV1` and `policyV2` (`lib/core/risk_policy.ts`):
 
 ```
 credit_line *= category_multiplier        # categoryRiskMultiplier(service_type)
 ```
 
-The weight comes from the `ServiceCategoryRegistry`
-(`lib/core/service_categories.ts` + the on-chain mirror), governance-tunable per
-category family:
+The weight comes from `lib/core/service_categories.ts` (the canonical,
+dependency-free source of truth: `categoryFamily`, `categoryRiskBps`,
+`categoryRiskMultiplier`) plus `lib/ledger/contracts/service_category_registry.ts`,
+a `ServiceCategoryRegistry` that seeds the same weights and lets governance
+`register_category` / `set_risk_weight` per category family at runtime, the same
+upgrade-without-redeploy story as the `RiskPolicyManager`'s v1→v2 swap above. It
+is wired through `Cred402Economy`/`Ledger` as `ledger.serviceCategories`, the same
+pattern every other registry (agents, evidence, disputes, …) follows:
 
 ```
 rwa 1.00 · compliance 0.95 · data/api 0.90 · compute/storage 0.85 ·
@@ -49,8 +55,22 @@ inference/dispute 0.80 · defi 0.75 · unknown 0.65 (conservative default)
 
 So a non-RWA agent (e.g. `inference.llm`) builds a credit line from its x402
 receipts alone — no RWA evidence required — just weighted for its category's risk.
-Run `npm run demo:x402` to see it. RWA evidence remains an optional *boost* for RWA
-categories, not a gate.
+Run `npm run demo:x402` (`scripts/universal_credit_demo.ts`) to see it: an
+`inference.llm` agent earning pure x402 revenue gets a real, nonzero credit line
+with zero RWA evidence, and the same receipt history priced under `rwa.*`,
+`compliance.*`, `inference.*` and `defi.*` to show the weight scaling the line.
+RWA evidence remains an optional *boost* for RWA categories, not a gate. Covered
+by `test/universal_credit.test.ts` (end-to-end, no-RWA-evidence underwriting) and
+`test/service_categories.test.ts` (every documented per-family weight pinned
+exactly, the conservative unknown default, and registry governance tuning).
+
+On-chain mirror: `ServiceCategoryRegistry` is implemented as an off-chain Casper
+contract analogue today (same pattern as `rwa_jobs`, `credit_authorization_notes`,
+`global_exposure_manager`, `upgrade_manager` — several registries in
+`lib/ledger/contracts/` have no deployed Rust counterpart under `contracts/`).
+A real Odra/Rust `service_category_registry` contract mirroring category weights
+on-chain is a legitimate follow-up (tracked, not hidden) but out of scope for this
+pass — we did not fake a deploy we couldn't verify.
 
 ## The upgrade (v2)
 
