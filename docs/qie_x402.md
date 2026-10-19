@@ -143,12 +143,23 @@ facilitator — it mirrors `/v1/x402/algorand/status`.
   `GET /v1/x402/external-receipts/:id` (the same endpoint Algorand's receipts
   use — receipt ids are a shared content hash, not chain-specific). Covered
   by `test/qie_receipt_anchor.test.ts` (6 tests, against a real `Ledger`).
-- No combined release-check / readiness script yet (Algorand has
-  `x402:algorand:ready` and `x402:algorand:release-check`, which fetch live
-  payer/receiver balances and write a signed evidence artifact). QIE has the
-  payment-free preflight check (`x402:qie:check`) but not yet the
-  balance-readiness or evidence-artifact scripts — add them once a facilitator
-  and the QUSDC contract address are confirmed and testable end-to-end.
+- ~~No combined release-check / readiness script yet~~ **Built.**
+  `scripts/qie_x402_ready.ts` (`x402:qie:ready`) and
+  `scripts/qie_x402_release_check.ts` (`x402:qie:release-check`) mirror
+  `algorand_x402_ready.ts` / `algorand_x402_release_check.ts` exactly: they
+  fetch the unpaid challenge, then fetch live payer/receiver balances over
+  the configured QIE RPC (`eth_chainId`, `eth_blockNumber`, ERC-20
+  `balanceOf`) via `lib/x402/qie_readiness.ts`, and `release-check` additionally
+  writes a SHA-256-sealed evidence artifact via `lib/x402/qie_release.ts`
+  (same "signed" = hash-sealed, no private key, mechanism as the Algorand
+  artifact). Both fail closed with a clear error — no guessed RPC URL or
+  contract address — if `CRED402_QIE_CLIENT_ADDRESS`,
+  `CRED402_QIE_EXPECTED_PAY_TO`, `CRED402_QIE_EXPECTED_ASSET_ADDRESS`, or (on
+  Mainnet) `CRED402_QIE_RPC_URL` are unset. Unlike Algorand's checks, there is
+  no ALGO-style minimum-balance/opt-in/fee-buffer check: QIE's EVM "exact"
+  scheme has no account-reserve equivalent, and the facilitator — not the
+  payer — pays settlement gas, so that check is not invented. Covered by
+  `test/qie_x402_ready.test.ts` (mocked RPC, no live network needed to pass).
 - No Bazaar-style discovery listing (QIE has no confirmed equivalent catalog
   yet, so none was wired in to avoid overclaiming discoverability that
   doesn't exist).
