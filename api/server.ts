@@ -4,6 +4,7 @@ import { json, readBody, readRawBody, serveStatic } from "./http_utils.js";
 import { handlePaidEvidence } from "./paid_evidence_server/index.js";
 import { handleAlgorandX402, startAlgorandReconciliation } from "./algorand_x402_routes.js";
 import { handleQieX402 } from "./qie_x402_routes.js";
+import { handleNearX402 } from "./near_x402_routes.js";
 import { Gateway, loadConfig, toApiError } from "../lib/gateway/index.js";
 import { V1Router } from "./v1/router.js";
 import { executeGraphQL, introspectionQuery } from "../lib/graphql/index.js";
@@ -109,6 +110,13 @@ const server = createServer(async (req, res) => {
     // ordering contract as the Algorand handler above, extracted to
     // api/qie_x402_routes.ts.
     if (await handleQieX402(req, res, state, url, { gateway, port: PORT })) return;
+
+    // ---- NEAR x402 payment domain (status, usage, attempts, paid credit
+    // score) for the NEAR Hackathon (Nov 1-14, 2026) — same ordering
+    // contract as the Algorand/QIE handlers above, extracted to
+    // api/near_x402_routes.ts. No facilitator: Cred402 verifies settlement
+    // itself against the configured NEAR RPC.
+    if (await handleNearX402(req, res, state, url, { gateway, port: PORT })) return;
 
     // ---- production versioned API (auth + rate limit + validation + envelope) ----
     if (pathname === "/v1" || pathname.startsWith("/v1/")) {

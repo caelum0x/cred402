@@ -87,6 +87,14 @@ import {
   type QieAnchorContext,
   type QieCreditScoreSettlement,
 } from "./qie_receipt_anchor.js";
+import {
+  anchorNearCreditScoreSettlement,
+  finalizeNearExternalReceipt,
+  challengeNearExternalReceipt,
+  nearX402Usage,
+  type NearAnchorContext,
+  type NearCreditScoreSettlement,
+} from "./near_receipt_anchor.js";
 
 /**
  * Server state — one persistent ledger + economy shared across all HTTP requests
@@ -463,6 +471,37 @@ export class ServerState {
   /** Public, aggregate-only usage proof for the QIE challenge endpoint. */
   qieX402Usage(network: string, assetAddress: string) {
     return qieX402Usage(this.qieAnchorContext(), network, assetAddress);
+  }
+
+  /** Dependencies for the NEAR x402 receipt-anchoring sub-domain, rebuilt
+   * fresh per call so the (reset-swappable) ledger + live seller id are current. */
+  private nearAnchorContext(): NearAnchorContext {
+    return {
+      ledger: this.ledger,
+      externalReceiptProofs: this.externalReceiptProofs,
+      sellerAgentId: this.economy.seller.agent_id,
+    };
+  }
+
+  /**
+   * Convert a successful NEAR x402 credit-report payment into the same
+   * Casper-rooted Universal Receipt used by the other satellite chains.
+   */
+  anchorNearCreditScoreSettlement(input: NearCreditScoreSettlement): { receipt_id: string } | null {
+    return anchorNearCreditScoreSettlement(this.nearAnchorContext(), input);
+  }
+
+  finalizeNearExternalReceipt(receiptId: string): void {
+    finalizeNearExternalReceipt(this.nearAnchorContext(), receiptId);
+  }
+
+  challengeNearExternalReceipt(receiptId: string): void {
+    challengeNearExternalReceipt(this.nearAnchorContext(), receiptId);
+  }
+
+  /** Public, aggregate-only usage proof for the NEAR challenge endpoint. */
+  nearX402Usage(network: string) {
+    return nearX402Usage(this.nearAnchorContext(), network);
   }
   /** Anonymized, k-anonymous public credit-data commons snapshot (p6 data moat). */
   dataCommons() {
