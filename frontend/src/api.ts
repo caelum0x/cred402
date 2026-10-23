@@ -452,7 +452,21 @@ export interface WebhookMeta {
   id: string;
   url: string;
   events: string[];
+  agent_filter?: string;
   created_at: number;
+  disabled_at?: number;
+}
+
+export interface WebhookDelivery {
+  id: string;
+  subscription_id: string;
+  event: string;
+  status: "delivered" | "failed";
+  http_status?: number;
+  attempts: number;
+  error?: string;
+  replay_of?: string;
+  at: number;
 }
 
 export async function listWebhooks(): Promise<WebhookMeta[]> {
@@ -465,6 +479,23 @@ export async function createWebhook(url: string, events: string[]): Promise<Webh
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url, events }),
   });
+}
+
+export async function disableWebhook(id: string): Promise<{ disabled: boolean }> {
+  return v1(`/webhooks/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+export async function enableWebhook(id: string): Promise<{ enabled: boolean }> {
+  return v1(`/webhooks/${encodeURIComponent(id)}/enable`, { method: "POST" });
+}
+
+export async function listWebhookDeliveries(subscriptionId?: string): Promise<WebhookDelivery[]> {
+  const qs = subscriptionId ? `?subscription_id=${encodeURIComponent(subscriptionId)}` : "";
+  return v1<WebhookDelivery[]>(`/webhooks/deliveries${qs}`);
+}
+
+export async function retryWebhookDelivery(deliveryId: string): Promise<WebhookDelivery> {
+  return v1(`/webhooks/deliveries/${encodeURIComponent(deliveryId)}/retry`, { method: "POST" });
 }
 
 export interface AgentProfile {

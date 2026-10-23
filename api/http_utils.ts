@@ -29,7 +29,7 @@ export function json(res: ServerResponse, status: number, body: unknown, headers
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, X-Payment, PAYMENT-SIGNATURE",
     "Access-Control-Expose-Headers": "PAYMENT-REQUIRED, PAYMENT-RESPONSE, X-PAYMENT-RESPONSE",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     ...headers,
   });
   res.end(payload);

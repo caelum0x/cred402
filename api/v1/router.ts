@@ -586,6 +586,9 @@ export class V1Router {
         const b = parse(v.object({ url: v.string({ min: 8 }), events: v.withDefault(v.array(v.string(), { max: 50 }), ["*"]), agent_filter: v.optional(v.string()) }), body);
         return this.gateway.webhooks.subscribe(b.url, b.events, b.agent_filter);
       }) ??
+      R("POST", "v1/webhooks/deliveries/:id/retry", "admin", ({ params }) => this.gateway.webhooks.redeliver(params.id!)) ??
+      R("POST", "v1/webhooks/:id/enable", "admin", ({ params }) => ({ enabled: this.gateway.webhooks.enable(params.id!) })) ??
+      R("DELETE", "v1/webhooks/:id", "admin", ({ params }) => ({ disabled: this.gateway.webhooks.unsubscribe(params.id!) })) ??
       undefined
     );
   }
@@ -658,7 +661,7 @@ function send(res: ServerResponse, status: number, body: unknown, requestId: str
     "X-Request-Id": requestId,
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Api-Key, Idempotency-Key",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     ...extra,
   });
   res.end(payload);
