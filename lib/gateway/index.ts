@@ -4,6 +4,7 @@ import { ApiKeyStore, type ApiKeyRecord, type Scope } from "./api_keys.js";
 import { RateLimiter } from "./rate_limit.js";
 import { IdempotencyStore } from "./idempotency.js";
 import { WebhookService } from "./webhooks.js";
+import { OrgStore } from "./orgs.js";
 import { ForbiddenError, RateLimitError, UnauthorizedError } from "./errors.js";
 import { randomBytes, createHash } from "node:crypto";
 
@@ -15,6 +16,7 @@ export * from "./api_keys.js";
 export * from "./rate_limit.js";
 export * from "./idempotency.js";
 export * from "./webhooks.js";
+export * from "./orgs.js";
 export * from "./persistence.js";
 
 export interface AuthContext {
@@ -34,6 +36,7 @@ export class Gateway {
   readonly rateLimiter: RateLimiter;
   readonly idempotency: IdempotencyStore;
   readonly webhooks: WebhookService;
+  readonly orgs: OrgStore;
   /** The bootstrap admin key minted from config, returned once at startup. */
   readonly bootstrapAdminKey?: string;
 
@@ -44,6 +47,7 @@ export class Gateway {
     this.rateLimiter = new RateLimiter(config.rateLimit.maxRequests, config.rateLimit.windowMs);
     this.idempotency = new IdempotencyStore();
     this.webhooks = new WebhookService(config.webhooks.maxRetries);
+    this.orgs = new OrgStore();
     if (config.authRequired && config.adminApiKey) {
       // Register the operator-provided admin key (store its hash, not the value).
       const issued = this.apiKeys.issue("bootstrap-admin", ["admin"]);
@@ -78,11 +82,25 @@ export class Gateway {
   }
 
   /**
-   * Resolve the auth context for a request. When auth is disabled (dev), the
-   * client IP is the rate-limit identity; otherwise a valid scoped key is required.
+   * Resolve the auth context for a request. When auth is disabled (dev), a
+   * MISSING key never blocks the request — the client IP is the rate-limit
+   * identity, same as before — but a VALID key, if one is presented, is
+   * still resolved onto the context AND still scope-checked. This lets
+   * org-scoped self-service routes (`/v1/orgs/*`) be exercised for real
+   * against a local dev server with a real issued key, with the exact same
+   * cross-tenant/scope enforcement they get once `CRED402_AUTH_REQUIRED=true`
+   * in production — without weakening dev mode's "no key presented never
+   * blocks" convenience for everything else.
    */
   authenticate(apiKeyHeader: string | undefined, clientIp: string, required: Scope): AuthContext {
     if (!this.config.authRequired) {
+      if (apiKeyHeader) {
+        const presented = this.apiKeys.verify(apiKeyHeader);
+        if (presented) {
+          if (!this.apiKeys.hasScope(presented, required)) throw new ForbiddenError(`requires '${required}' scope`);
+          return { key: presented, identity: `key:${presented.id}` };
+        }
+      }
       return { identity: `ip:${clientIp}` };
     }
     const key = this.apiKeys.verify(apiKeyHeader);

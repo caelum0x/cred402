@@ -434,6 +434,9 @@ export interface ApiKeyMeta {
   scopes: string[];
   created_at: number;
   revoked_at?: number;
+  org_id?: string;
+  request_count?: number;
+  last_used_at?: number;
 }
 
 export async function listApiKeys(): Promise<ApiKeyMeta[]> {
@@ -446,6 +449,69 @@ export async function createApiKey(name: string, scopes: string[]): Promise<{ id
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, scopes }),
   });
+}
+
+// -- Organizations (multi-tenant API-key scoping, /v1/orgs) -----------------
+//
+// Two auth tiers: `POST/GET /v1/orgs` need the platform admin key (the
+// console's own calls — no header needed in local dev, see `v1()`); every
+// "self-service" call below authenticates as the ORG'S OWN key via a
+// Bearer header, exactly like an external integrator would — the console
+// never touches the platform admin key for these.
+
+export interface Org {
+  id: string;
+  name: string;
+  plan: "free" | "pro" | "enterprise";
+  created_at: number;
+}
+
+export interface OrgWithKeys extends Org {
+  keys: ApiKeyMeta[];
+}
+
+export interface IssuedOrgKey {
+  id: string;
+  secret: string;
+  scopes: string[];
+  org_id?: string;
+}
+
+/** Platform-operator onboarding: mint a new org + its first (owner) key. Admin-scoped. */
+export async function createOrg(name: string, plan: Org["plan"] = "free"): Promise<{ org: Org; owner_key: IssuedOrgKey }> {
+  return v1("/orgs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, plan }),
+  });
+}
+
+/** Platform-operator view of every org. Admin-scoped. */
+export async function listOrgs(): Promise<Org[]> {
+  return v1<Org[]>("/orgs");
+}
+
+function bearer(secret: string): RequestInit {
+  return { headers: { Authorization: `Bearer ${secret}` } };
+}
+
+/** Self-service: the org that owns `secret` looking at its own profile + keys. */
+export async function getMyOrg(secret: string): Promise<OrgWithKeys> {
+  return v1<OrgWithKeys>("/orgs/me", bearer(secret));
+}
+
+/** Self-service: mint a sibling key for a teammate, scoped to ⊆ the caller's own scopes. */
+export async function mintOrgKey(secret: string, name: string, scopes: Array<"read" | "write">): Promise<IssuedOrgKey> {
+  return v1("/orgs/keys", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name, scopes }),
+  });
+}
+
+/** Self-service: revoke a key — the gateway 404s if it belongs to a different org than `secret`'s. */
+export async function revokeOrgKey(secret: string, keyId: string): Promise<{ revoked: boolean }> {
+  return v1(`/orgs/keys/${encodeURIComponent(keyId)}`, { method: "DELETE", ...bearer(secret) });
 }
 
 export interface WebhookMeta {

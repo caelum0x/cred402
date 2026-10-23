@@ -11,6 +11,7 @@ import {
   parse,
   v,
   type Scope,
+  type AuthContext,
 } from "../../lib/gateway/index.js";
 import { casperLiveBridge } from "../../lib/casper/live_bridge.js";
 
@@ -60,14 +61,14 @@ export class V1Router {
           log.info("idempotent replay", { status: hit.status, key_id: auth.key?.id });
           return send(res, hit.status, hit.body, requestId, rlHeaders);
         }
-        const result = await route.run({ params: route.params, body, url });
+        const result = await route.run({ params: route.params, body, url, auth });
         this.gateway.idempotency.put(idemKey, fp, 200, ok(result, requestId));
         log.info("ok", { status: 200, key_id: auth.key?.id, ms: Date.now() - started });
         this.gateway.recordHttp(routeLabel, 200);
         return send(res, 200, ok(result, requestId), requestId, rlHeaders);
       }
 
-      const result = await route.run({ params: route.params, body, url });
+      const result = await route.run({ params: route.params, body, url, auth });
       log.info("ok", { status: 200, key_id: auth.key?.id, ms: Date.now() - started });
       this.gateway.recordHttp(routeLabel, 200);
       return send(res, 200, ok(result, requestId), requestId, rlHeaders);
@@ -580,6 +581,60 @@ export class V1Router {
         );
         return this.gateway.apiKeys.issue(b.name, b.scopes);
       }) ??
+      // -- organizations (multi-tenant API-key scoping) --------------------
+      // Platform operator onboards a new paying integrator once with the
+      // admin key; from then on the org is fully self-service through its
+      // OWN org-scoped key (no further admin-key involvement) — the actual
+      // tenant-isolation boundary, since a key can only ever see, mint, or
+      // revoke credentials inside its own org_id.
+      R("POST", "v1/orgs", "admin", ({ body }) => {
+        const b = parse(
+          v.object({ name: v.string({ min: 1, max: 80 }), plan: v.withDefault(v.literalUnion("free", "pro", "enterprise"), "free") }),
+          body,
+        );
+        const org = this.gateway.orgs.create(b.name, b.plan);
+        const owner_key = this.gateway.apiKeys.issue(`${b.name} — owner`, ["read", "write"], org.id);
+        return { org, owner_key };
+      }) ??
+      R("GET", "v1/orgs", "admin", () => this.gateway.orgs.list()) ??
+      // Below this line: callers authenticate with their OWN org key, not the
+      // platform admin key. `auth.key?.org_id` is undefined for the platform
+      // bootstrap key (orgless by design) and for dev-mode requests that
+      // present no key at all — both are correctly refused here.
+      //
+      // IMPORTANT: these literal-segment GETs ("me", "keys") must stay ABOVE
+      // "v1/orgs/:id" below — the router matches path patterns in the order
+      // they're written (no longest-match/specificity ranking), so if the
+      // wildcard were listed first it would swallow "me"/"keys" as an org id.
+      R("GET", "v1/orgs/me", "read", ({ auth }) => {
+        const orgId = requireOrg(auth);
+        return { ...required(this.gateway.orgs.get(orgId), "organization"), keys: this.gateway.apiKeys.listByOrg(orgId) };
+      }) ??
+      R("GET", "v1/orgs/keys", "read", ({ auth }) => this.gateway.apiKeys.listByOrg(requireOrg(auth))) ??
+      R("POST", "v1/orgs/keys", "write", ({ body, auth }) => {
+        const orgId = requireOrg(auth);
+        const b = parse(
+          v.object({ name: v.string({ min: 1, max: 64 }), scopes: v.optional(v.array(v.literalUnion("read", "write"), { max: 2 })) }),
+          body,
+        );
+        const scopes: Array<"read" | "write"> = b.scopes ?? ["read"];
+        const callerScopes = auth.key!.scopes;
+        const escalation = scopes.filter((sc) => !callerScopes.includes(sc));
+        if (escalation.length) throw new ApiError(403, "forbidden", `cannot mint a key with scopes your own key lacks: ${escalation.join(", ")}`);
+        return this.gateway.apiKeys.issue(b.name, scopes, orgId);
+      }) ??
+      R("DELETE", "v1/orgs/keys/:id", "write", ({ params, auth }) => {
+        const orgId = requireOrg(auth);
+        const target = this.gateway.apiKeys.get(params.id!);
+        if (!target || target.org_id !== orgId) throw new ApiError(404, "not_found", "no key with that id in your organization");
+        return { revoked: this.gateway.apiKeys.revoke(params.id!) };
+      }) ??
+      // Platform-operator lookup of any org by id — admin scope, deliberately
+      // listed AFTER the literal "me"/"keys" GETs above (see note there).
+      R("GET", "v1/orgs/:id", "admin", ({ params }) => {
+        const org = required(this.gateway.orgs.get(params.id!), "organization");
+        return { ...org, keys: this.gateway.apiKeys.listByOrg(org.id) };
+      }) ??
       R("GET", "v1/webhooks", "admin", () => this.gateway.webhooks.list()) ??
       R("GET", "v1/webhooks/deliveries", "admin", ({ url }) => this.gateway.webhooks.deliveries(url.searchParams.get("subscription_id") ?? undefined)) ??
       R("POST", "v1/webhooks", "admin", ({ body }) => {
@@ -598,11 +653,19 @@ interface Ctx {
   params: Record<string, string>;
   body: unknown;
   url: URL;
+  auth: AuthContext;
 }
 
 function required<T>(value: T | undefined, what: string): T {
   if (value === undefined || value === null) throw new ApiError(404, "not_found", `${what} not found`);
   return value;
+}
+
+/** The org id of the calling key, or a 403 — the gate for every `/v1/orgs/*` self-service route. */
+function requireOrg(auth: AuthContext): string {
+  const orgId = auth.key?.org_id;
+  if (!orgId) throw new ApiError(403, "forbidden", "this route requires an org-scoped API key (not the platform admin key)");
+  return orgId;
 }
 
 /**

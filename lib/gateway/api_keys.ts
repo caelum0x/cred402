@@ -19,6 +19,10 @@ export interface ApiKeyRecord {
   created_at: number;
   revoked_at?: number;
   last_used_at?: number;
+  /** Which {@link Org} this key belongs to. Undefined for the platform bootstrap/admin key — it is orgless by design, not a tenant. */
+  org_id?: string;
+  /** Successful-auth count — the basis for per-org usage reporting (org usage = sum over its keys). */
+  request_count: number;
 }
 
 export interface IssuedKey {
@@ -26,6 +30,7 @@ export interface IssuedKey {
   /** The full secret — returned ONCE, never stored or logged. */
   secret: string;
   scopes: Scope[];
+  org_id?: string;
 }
 
 function sha256(input: string): string {
@@ -38,12 +43,12 @@ export class ApiKeyStore {
   constructor(private readonly now: () => number = () => Date.now()) {}
 
   /** Mint a new key. The secret is `c402_<id>_<random>`; only its hash is kept. */
-  issue(name: string, scopes: Scope[]): IssuedKey {
+  issue(name: string, scopes: Scope[], orgId?: string): IssuedKey {
     const id = "k_" + randomBytes(6).toString("hex");
     const secretPart = randomBytes(24).toString("base64url");
     const secret = `c402_${id}_${secretPart}`;
-    this.keys.set(id, { id, name, hash: sha256(secret), scopes, created_at: this.now() });
-    return { id, secret, scopes };
+    this.keys.set(id, { id, name, hash: sha256(secret), scopes, created_at: this.now(), org_id: orgId, request_count: 0 });
+    return { id, secret, scopes, org_id: orgId };
   }
 
   /** Verify a presented secret and return its record, or undefined if invalid. */
@@ -57,6 +62,7 @@ export class ApiKeyStore {
     const stored = Buffer.from(record.hash);
     if (presented.length !== stored.length || !timingSafeEqual(presented, stored)) return undefined;
     record.last_used_at = this.now();
+    record.request_count += 1;
     return record;
   }
 
@@ -70,6 +76,15 @@ export class ApiKeyStore {
   /** Public metadata only — never includes the hash. */
   list(): Array<Omit<ApiKeyRecord, "hash">> {
     return [...this.keys.values()].map(({ hash: _hash, ...rest }) => rest);
+  }
+
+  /** Keys belonging to one org — the tenant-scoped view a non-admin org key is allowed to see. */
+  listByOrg(orgId: string): Array<Omit<ApiKeyRecord, "hash">> {
+    return this.list().filter((k) => k.org_id === orgId);
+  }
+
+  get(id: string): ApiKeyRecord | undefined {
+    return this.keys.get(id);
   }
 
   hasScope(record: ApiKeyRecord, scope: Scope): boolean {

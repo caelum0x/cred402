@@ -4,17 +4,20 @@ import {
   type ApiKeyMeta, type ProtocolConfig,
 } from "../api";
 import { Webhooks } from "./Webhooks";
+import { Orgs } from "./Orgs";
 
 /**
- * Developer portal — manage production API keys + webhooks (the /v1/admin surface),
- * run live GraphQL queries, and read the protocol rulebook. The console talks to the
- * real gateway, so keys minted here authenticate real /v1 requests and webhooks fire.
+ * Developer portal — manage production API keys, organizations/multi-tenant
+ * scoping, and webhooks (the /v1/admin + /v1/orgs surface), run live GraphQL
+ * queries, and read the protocol rulebook. The console talks to the real
+ * gateway, so keys minted here authenticate real /v1 requests and webhooks fire.
  */
 export function Developer() {
   return (
     <div className="pool">
       <ProtocolRulebook />
       <ApiKeys />
+      <Orgs />
       <Webhooks />
       <GraphQLConsole />
     </div>

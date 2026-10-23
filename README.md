@@ -327,6 +327,7 @@ Runnable samples per rail: [`docs/integrations/`](docs/integrations/README.md).
 
 - **No secrets in source** — env-driven, validated and fail-fast at boot; `.env` gitignored.
 - **AuthN/Z** — scoped API keys (SHA-256 at rest, constant-time verify); wallet sign-in via ed25519 challenge/response.
+- **Multi-tenant orgs** — every paying integrator gets one org (`POST /v1/orgs`, admin-onboarded once); from then on it's self-service (`/v1/orgs/me`, `/v1/orgs/keys`) — a key can mint sibling keys only up to its own scopes and can only ever see or revoke credentials inside its own org, even with a valid key.
 - **Replay protection** — nonce + payment-proof dedupe on x402 receipts; one-time CANs; global exposure cap.
 - **Privacy** — no PII on-chain; Stripe/Plaid data committed only as hashes.
 - **Accountability** — WatchdogAgent → DisputeCourt → SlashingVault; fraud graph gates underwriting.
