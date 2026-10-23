@@ -4,7 +4,7 @@ import { ApiKeyStore, type ApiKeyRecord, type Scope } from "./api_keys.js";
 import { RateLimiter } from "./rate_limit.js";
 import { IdempotencyStore } from "./idempotency.js";
 import { WebhookService } from "./webhooks.js";
-import { OrgStore } from "./orgs.js";
+import { OrgStore, planRateLimit } from "./orgs.js";
 import { ForbiddenError, RateLimitError, UnauthorizedError } from "./errors.js";
 import { randomBytes, createHash } from "node:crypto";
 
@@ -109,9 +109,53 @@ export class Gateway {
     return { key, identity: `key:${key.id}` };
   }
 
-  enforceRateLimit(identity: string): { remaining: number; limit: number } {
-    const r = this.rateLimiter.check(identity);
+  /**
+   * `capacity` is optional and defaults to the platform-wide config value —
+   * existing callers that pass only an identity are unaffected. Pass an
+   * override (see {@link rateLimitKeyFor}) to size the bucket by plan.
+   */
+  enforceRateLimit(identity: string, capacity?: number): { remaining: number; limit: number } {
+    const cap = capacity ?? this.config.rateLimit.maxRequests;
+    const r = this.rateLimiter.check(identity, 1, cap);
     if (!r.allowed) throw new RateLimitError(r.retryAfterMs);
-    return { remaining: r.remaining, limit: this.config.rateLimit.maxRequests };
+    return { remaining: r.remaining, limit: cap };
+  }
+
+  /**
+   * Resolve the rate-limit bucket identity + capacity for a request.
+   *
+   * Org-scoped keys share ONE bucket per org (`org:<id>`), sized by the
+   * org's `plan` — this is what makes rate limiting billing-correct: a
+   * free-plan org with 5 teammate keys gets the SAME effective limit as a
+   * free-plan org with 1 key, not 5x. Orgless credentials (the platform
+   * bootstrap/admin key, or anonymous `ip:` identities in dev) keep the
+   * pre-org per-identity behavior, bucketed on `auth.identity` at the
+   * platform-wide default capacity.
+   */
+  rateLimitKeyFor(auth: AuthContext): { identity: string; capacity: number } {
+    const orgId = auth.key?.org_id;
+    if (orgId) {
+      const org = this.orgs.get(orgId);
+      return { identity: `org:${orgId}`, capacity: org ? planRateLimit(org.plan) : this.config.rateLimit.maxRequests };
+    }
+    return { identity: auth.identity, capacity: this.config.rateLimit.maxRequests };
+  }
+
+  /**
+   * Usage snapshot for an org's self-service `/v1/orgs/usage` view: its
+   * current rate-limit bucket state (without consuming a token) plus the
+   * total successful-request count across all its keys (`request_count` is
+   * already tracked per key — this just sums it).
+   */
+  orgUsage(orgId: string): { plan: string; rate_limit: { limit: number; remaining: number; window_ms: number }; total_requests: number } {
+    const org = this.orgs.get(orgId);
+    const capacity = org ? planRateLimit(org.plan) : this.config.rateLimit.maxRequests;
+    const status = this.rateLimiter.peek(`org:${orgId}`, capacity);
+    const total_requests = this.apiKeys.listByOrg(orgId).reduce((sum, k) => sum + k.request_count, 0);
+    return {
+      plan: org?.plan ?? "free",
+      rate_limit: { limit: status.limit, remaining: status.remaining, window_ms: this.config.rateLimit.windowMs },
+      total_requests,
+    };
   }
 }

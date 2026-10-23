@@ -3,9 +3,11 @@ import {
   createOrg,
   listOrgs,
   getMyOrg,
+  getOrgUsage,
   mintOrgKey,
   revokeOrgKey,
   type Org,
+  type OrgUsage,
   type OrgWithKeys,
 } from "../api";
 
@@ -121,6 +123,7 @@ function OperatorOnboarding() {
 function SelfService() {
   const [secret, setSecret] = useState("");
   const [org, setOrg] = useState<OrgWithKeys | null>(null);
+  const [usage, setUsage] = useState<OrgUsage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyName, setKeyName] = useState("teammate");
   const [scopes, setScopes] = useState<Array<"read" | "write">>(["read"]);
@@ -130,9 +133,12 @@ function SelfService() {
   const load = async (s: string) => {
     setError(null);
     try {
-      setOrg(await getMyOrg(s));
+      const [o, u] = await Promise.all([getMyOrg(s), getOrgUsage(s)]);
+      setOrg(o);
+      setUsage(u);
     } catch (e) {
       setOrg(null);
+      setUsage(null);
       setError(e instanceof Error ? e.message : String(e));
     }
   };
@@ -203,7 +209,22 @@ function SelfService() {
               <span className="stat-label">Keys</span>
               <span className="stat-value">{org.keys.length}</span>
             </div>
+            {usage && (
+              <div className="stat">
+                <span className="stat-label">Total requests</span>
+                <span className="stat-value">{usage.total_requests}</span>
+              </div>
+            )}
           </div>
+          {usage && (
+            <>
+              <OrgRateLimitMeter usage={usage} />
+              <p className="muted" style={{ marginTop: -4 }}>
+                One shared rate-limit bucket for the whole org (sized by plan) — minting more teammate keys does not
+                multiply the limit.
+              </p>
+            </>
+          )}
           <table className="table">
             <thead>
               <tr>
@@ -265,6 +286,29 @@ function SelfService() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/** Org-scoped rate-limit bucket status — one bar for the whole org, not per key. */
+function OrgRateLimitMeter({ usage }: { usage: OrgUsage }) {
+  const { limit, remaining } = usage.rate_limit;
+  const used = Math.max(0, limit - remaining);
+  const pct = limit > 0 ? Math.max(0, Math.min(100, (used / limit) * 100)) : 0;
+  const windowSec = Math.round(usage.rate_limit.window_ms / 1000);
+  return (
+    <div className="meter">
+      <div className="meter-top">
+        <span>
+          Rate limit (<span className="chip">{usage.plan}</span> plan · per {windowSec}s window)
+        </span>
+        <b>
+          {remaining} / {limit} left
+        </b>
+      </div>
+      <div className="bar">
+        <div className={`fill ${pct > 85 ? "" : "accent"}`} style={{ width: `${pct}%` }} />
+      </div>
     </div>
   );
 }

@@ -514,6 +514,22 @@ export async function revokeOrgKey(secret: string, keyId: string): Promise<{ rev
   return v1(`/orgs/keys/${encodeURIComponent(keyId)}`, { method: "DELETE", ...bearer(secret) });
 }
 
+export interface OrgUsage {
+  plan: string;
+  rate_limit: { limit: number; remaining: number; window_ms: number };
+  total_requests: number;
+}
+
+/**
+ * Self-service: the org's current rate-limit bucket (ONE shared bucket per
+ * org, sized by plan — not per key) plus its total request count across all
+ * keys. The billing-correctness view: a free-plan org with 5 teammate keys
+ * sees the same shared limit as a free-plan org with 1 key.
+ */
+export async function getOrgUsage(secret: string): Promise<OrgUsage> {
+  return v1<OrgUsage>("/orgs/usage", bearer(secret));
+}
+
 export interface WebhookMeta {
   id: string;
   url: string;

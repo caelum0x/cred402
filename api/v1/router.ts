@@ -48,7 +48,11 @@ export class V1Router {
       if (!route) throw new ApiError(404, "not_found", `no route for ${method} ${path}`);
 
       const auth = this.gateway.authenticate(apiKey, clientIp, route.scope);
-      const rl = this.gateway.enforceRateLimit(auth.identity);
+      // Org-scoped keys share one bucket per org, sized by plan — see
+      // `rateLimitKeyFor` — so an org's effective limit doesn't multiply
+      // with its teammate-key count.
+      const rlKey = this.gateway.rateLimitKeyFor(auth);
+      const rl = this.gateway.enforceRateLimit(rlKey.identity, rlKey.capacity);
       const rlHeaders = { "X-RateLimit-Limit": String(rl.limit), "X-RateLimit-Remaining": String(rl.remaining) };
 
       const body = method === "POST" ? await readJson(req) : {};
@@ -611,6 +615,12 @@ export class V1Router {
         return { ...required(this.gateway.orgs.get(orgId), "organization"), keys: this.gateway.apiKeys.listByOrg(orgId) };
       }) ??
       R("GET", "v1/orgs/keys", "read", ({ auth }) => this.gateway.apiKeys.listByOrg(requireOrg(auth))) ??
+      // Usage + rate-limit status for the caller's own org — the billing-
+      // correctness view: one shared bucket per org (sized by plan), not
+      // one per key. Listed above the "me"/"keys" literal guard note below
+      // doesn't apply here (no wildcard collision) but kept alongside its
+      // sibling self-service GETs for readability.
+      R("GET", "v1/orgs/usage", "read", ({ auth }) => this.gateway.orgUsage(requireOrg(auth))) ??
       R("POST", "v1/orgs/keys", "write", ({ body, auth }) => {
         const orgId = requireOrg(auth);
         const b = parse(

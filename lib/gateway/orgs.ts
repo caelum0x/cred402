@@ -24,6 +24,24 @@ export interface Org {
   created_at: number;
 }
 
+/**
+ * Requests-per-window burst capacity by plan (follow-up from the 2026-10-24
+ * org build: rate limiting used to be per-API-key, so a free-plan org with 5
+ * keys got 5x the effective limit of a single-key org — not billing-correct
+ * for a real `plan` field). `free` matches the platform's pre-org default
+ * (`CRED402_RATE_MAX`, 120/min) so onboarding an org never makes a single-key
+ * integrator worse off than before orgs existed.
+ */
+export const PLAN_RATE_LIMITS: Record<Plan, number> = {
+  free: 120,
+  pro: 1_000,
+  enterprise: 10_000,
+};
+
+export function planRateLimit(plan: Plan): number {
+  return PLAN_RATE_LIMITS[plan];
+}
+
 export class OrgStore {
   private readonly orgs = new Map<string, Org>();
 
