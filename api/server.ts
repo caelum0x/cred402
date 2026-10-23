@@ -14,6 +14,7 @@ import { toCsv } from "../lib/services/csv.js";
 import { loadChainManifest } from "../lib/services/chain_manifest.js";
 import { renderCreditReportHtml } from "../lib/services/report_html.js";
 import type { CreditReport } from "../lib/services/credit_report.js";
+import { shouldAutoStart, keepaliveUrl, pingSelf } from "../lib/services/keepalive.js";
 
 /**
  * Cred402 API server — zero external dependencies (node:http only).
@@ -461,7 +462,7 @@ const server = createServer(async (req, res) => {
         }
         case "/api/credit/deposit": {
           const b = (await readBody(req)) as { amount_cspr?: number };
-          return json(res, 200, state.mDeposit(Number(b.amount_cspr ?? 100)));
+          return json(res, 200, await state.mDeposit(Number(b.amount_cspr ?? 100)));
         }
         case "/api/realfi/verify-operator": {
           const b = (await readBody(req)) as {
@@ -618,4 +619,19 @@ server.listen(PORT, () => {
   console.log(`  public credit report:     http://localhost:${PORT}/report/EvidenceSellerAgent`);
   console.log(`  csv export:               http://localhost:${PORT}/api/export/agents.csv`);
   console.log(`  x402 paid endpoint:       curl -s "http://localhost:${PORT}/verify/energy_output?rwa_id=SOLAR-A17"`);
+
+  // Cold-start fix (p10): on Render (or with CRED402_KEEPALIVE_URL set), self-ping
+  // this service's own public URL every 10 min — under Render's ~15 min idle
+  // threshold — so it never idles out from under a real first-time x402 caller.
+  // Deliberately a standalone timer, NOT the AutonomousScheduler used for
+  // keeper-sweep/automations (those stay opt-in; this is pure uptime hygiene).
+  // No-op anywhere else. See lib/services/keepalive.ts.
+  if (shouldAutoStart()) {
+    gateway.log.info("keepalive self-ping scheduled", { url: keepaliveUrl(), interval_sec: 600 });
+    setInterval(() => {
+      void pingSelf().then((r) => {
+        if (!r.ok) gateway.log.warn("keepalive self-ping failed", { url: r.url, error: r.error, status: r.status });
+      });
+    }, 600_000).unref();
+  }
 });

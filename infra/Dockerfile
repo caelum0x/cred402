@@ -17,6 +17,11 @@ WORKDIR /app
 # Non-root runtime user.
 RUN useradd --no-create-home --uid 10001 cred402
 COPY --from=frontend /app /app
+# /data is where CRED402_DATA_DIR writes (event journal, payment-attempt
+# stores, etc.) — it must be owned by the runtime user BEFORE the volume is
+# mounted, or every write fails EACCES the moment a volume (named or bind)
+# is attached at this mount point, since Docker otherwise creates it root:root.
+RUN mkdir -p /data && chown -R cred402:cred402 /app /data
 USER cred402
 
 EXPOSE 4021

@@ -78,13 +78,42 @@ export class Cred402Client {
     return () => es.close();
   }
 
+  /**
+   * Cold-start-aware request: the hosted reference deployment (Render free tier)
+   * can take 30-60s to wake from idle. Retries transient network failures and
+   * 502/503 "still booting" responses with backoff for ~60s before giving up,
+   * so a real first-time integrator's call survives the wake-up instead of
+   * reading as a dead API. Resolves on the first try once the backend is warm.
+   */
+  private async requestWithRetry(path: string, init: RequestInit): Promise<Response> {
+    const delays = [1500, 3000, 6000, 10000, 15000, 20000];
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 12_000);
+        const res = await fetch(`${this.baseUrl}${path}`, { ...init, signal: controller.signal });
+        clearTimeout(timeout);
+        if ((res.status === 502 || res.status === 503) && attempt < delays.length) {
+          throw new Error(`${path} -> ${res.status} (cold start?)`);
+        }
+        return res;
+      } catch (err) {
+        lastErr = err;
+        if (attempt >= delays.length) break;
+        await new Promise((r) => setTimeout(r, delays[attempt]));
+      }
+    }
+    throw lastErr instanceof Error ? lastErr : new Error(`${path} failed`);
+  }
+
   private async get(path: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}${path}`);
+    const res = await this.requestWithRetry(path, { method: "GET" });
     if (!res.ok) throw new Error(`${path} -> ${res.status}`);
     return res.json();
   }
   private async post(path: string, body?: unknown): Promise<any> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this.requestWithRetry(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,

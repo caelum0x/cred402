@@ -12,6 +12,7 @@ import {
   v,
   type Scope,
 } from "../../lib/gateway/index.js";
+import { casperLiveBridge } from "../../lib/casper/live_bridge.js";
 
 /**
  * Cred402 public REST API v1 (p2 §7.1).
@@ -113,6 +114,9 @@ export class V1Router {
       // On-chain deployment manifest: real Casper Testnet contracts + install
       // deploy transactions, each with a cspr.live link (observability, p2 §7.1).
       R("GET", "v1/chain", "read", () => s.chainManifest()) ??
+      // Live write-path status (p8): is a funded operator key configured, is the
+      // node reachable, and the recent register/stake/score/deposit mirror log.
+      R("GET", "v1/casper/live", "read", () => s.casperLiveStatus()) ??
       R("POST", "v1/auth/wallet/challenge", "read", ({ body }) => {
         const b = parse(v.object({ account: v.string({ min: 66, max: 66 }) }), body);
         return s.walletChallenge(b.account);
@@ -153,6 +157,21 @@ export class V1Router {
       R("GET", "v1/compliance/agents/:id", "read", ({ params }) => s.complianceScreen(params.id!)) ??
       R("GET", "v1/compliance/report", "read", () => s.complianceReport()) ??
       R("GET", "v1/agents/:id/profile", "read", ({ params }) => s.agentProfile(params.id!)) ??
+      // Convenience alias (STRATEGY-2026-10-23.md §2, "turn competitors into
+      // distribution channels"): the SAME credit-score logic the chain-specific
+      // x402-PAID routes serve (api/{algorand,qie,near}_x402_routes.ts — note
+      // "/v1/x402/credit-score/:id" without a chain segment is ALREADY the
+      // Algorand paid route, regex-matched in server.ts ahead of this router;
+      // this alias deliberately lives at a different path so it never shadows
+      // or is shadowed by that), as a plain scoped/rate-limited v1 GET for
+      // integrators who already bill their own callers over Skyfire/
+      // Nevermined/Coinbase x402 and just want one documented call to
+      // underwrite with — no second x402 paywall to clear.
+      R("GET", "v1/credit-score/:agentId", "read", ({ params }) => {
+        const report = s.x402CreditScore(params.agentId!);
+        if ("error" in report) throw new ApiError(404, "not_found", report.error ?? `unknown agent: ${params.agentId}`);
+        return report;
+      }) ??
       R("POST", "v1/agents/:id/capabilities", "write", ({ params, body }) => {
         const b = parse(v.object({ capabilities: v.array(v.string(), { max: 32 }), spending_limit_cspr: v.optional(v.number({ min: 0 })) }), body);
         return s.setCapabilities(params.id!, b.capabilities, b.spending_limit_cspr);
@@ -326,7 +345,7 @@ export class V1Router {
         const b = parse(v.object({ from: v.string({ min: 2 }), to: v.string({ min: 2 }), note: v.withDefault(v.string({ max: 200 }), "") }), body);
         return s.attest(b.from, b.to, b.note);
       }) ??
-      R("POST", "v1/agents", "write", ({ body }) => {
+      R("POST", "v1/agents", "write", async ({ body }) => {
         const a = parse(
           v.object({
             agent_id: v.string({ min: 2, max: 64 }),
@@ -344,7 +363,13 @@ export class V1Router {
           body,
         );
         s.ledger.agents.register_agent(a);
-        return s.ledger.buildPassport(a.agent_id);
+        const passport = s.ledger.buildPassport(a.agent_id);
+        const casper_live = await casperLiveBridge().mirrorRegisterAgent({
+          agentId: a.agent_id,
+          serviceType: a.service_type,
+          agentPublicKeyHex: a.agent_public_key,
+        });
+        return { ...passport, casper_live };
       }) ??
       R("POST", "v1/agents/batch", "write", ({ body }) => {
         const b = parse(

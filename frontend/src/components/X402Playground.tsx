@@ -94,13 +94,20 @@ export function X402Playground({ agentIds }: { agentIds: readonly string[] }) {
   const [tampered, setTampered] = useState(false);
   const [trace, setTrace] = useState<X402Trace | null>(null);
   const [busy, setBusy] = useState(false);
+  const [coldStart, setColdStart] = useState<{ attempt: number; elapsedMs: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const run = async () => {
     setBusy(true);
+    setColdStart(null);
+    setError(null);
     try {
-      setTrace(await x402Buy(type, tampered));
+      setTrace(await x402Buy(type, tampered, (attempt, elapsedMs) => setColdStart({ attempt, elapsedMs })));
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setBusy(false);
+      setColdStart(null);
     }
   };
 
@@ -119,6 +126,12 @@ export function X402Playground({ agentIds }: { agentIds: readonly string[] }) {
           </button>
           <button className="btn primary" disabled={busy} onClick={run}>{busy ? "Running…" : "▶ Run x402 purchase"}</button>
         </div>
+        {coldStart && (
+          <p className="chip warn" style={{ marginTop: 10 }}>
+            ⟳ cold start — API was asleep, retrying automatically (attempt {coldStart.attempt}, {Math.round(coldStart.elapsedMs / 1000)}s so far)…
+          </p>
+        )}
+        {error && <p className="chip bad" style={{ marginTop: 10 }}>✗ {error}</p>}
       </div>
 
       <ServiceMarket />

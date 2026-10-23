@@ -75,7 +75,30 @@ services:
       # forwarded host headers from rewriting the Bazaar resource URL.
       - key: CRED402_PUBLIC_URL
         value: https://cred402-1.onrender.com
-      # Sim/free mode by default. Set these in the Render dashboard to go live:
-      #   CRED402_CHAIN=testnet, CRED402_NODE, CRED402_SECRET_KEY,
+      # Casper live write path (p8): `npm run casper:keygen` generates a key
+      # offline, fund it free at https://testnet.cspr.live/tools/faucet, then
+      # paste the PEM contents here (owner/captcha step — see BUILD-LOG-2026-10-23.md).
+      - key: CRED402_CASPER_NODE_URL
+        value: https://node.testnet.casper.network/rpc
+      - key: CRED402_CASPER_SECRET_KEY_PEM
+        sync: false
+      # NEAR x402 credit-score route (no facilitator needed — self-verified against
+      # NEAR RPC): `npm run near:keygen` prints a ready-to-fund implicit account id;
+      # fund it free at https://near-faucet.io (owner/captcha step), then paste it here.
+      - key: CRED402_NEAR_PAY_TO
+        sync: false
+      - key: CRED402_NEAR_NETWORK
+        value: testnet
+      # QIE x402 credit-score route stays 503 — CRED402_QIE_ASSET_ADDRESS (QUSDC's
+      # ERC-20 contract on QIE testnet) and CRED402_QIE_FACILITATOR_URL (no public
+      # x402 facilitator for QIE is confirmed to exist) are both still unconfirmed
+      # externally; see .env.example and docs/qie_x402.md before setting these.
+      - key: CRED402_QIE_PAY_TO
+        sync: false
+      - key: CRED402_QIE_ASSET_ADDRESS
+        sync: false
+      - key: CRED402_QIE_FACILITATOR_URL
+        sync: false
+      # Sim/free mode by default otherwise. Also available:
       #   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PLAID_CLIENT_ID, PLAID_SECRET,
       #   CRED402_X402_FACILITATOR_URL, CRED402_SIDECAR_URL

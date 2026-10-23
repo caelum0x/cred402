@@ -1,4 +1,5 @@
 import { Ledger, EventBus, Clock } from "../lib/ledger/index.js";
+import { casperLiveBridge } from "../lib/casper/live_bridge.js";
 import { Cred402Economy, type StepLog } from "../agents/economy.js";
 import { FraudService } from "../lib/services/fraud_service.js";
 import { generateEvmKeypair, type PaymentChallenge } from "../lib/x402/index.js";
@@ -228,6 +229,13 @@ export class ServerState {
    * deploy transactions, each with a cspr.live explorer link (on-chain observability). */
   chainManifest() {
     return loadChainManifest();
+  }
+
+  /** Live write-path status (p8): configured?, node reachable?, recent mirror log. */
+  async casperLiveStatus() {
+    const bridge = casperLiveBridge();
+    const health = await bridge.health();
+    return { live: bridge.live, ...health, recent: bridge.recentActivity() };
   }
 
   /** Human notification feed derived from the event stream. */
@@ -793,9 +801,11 @@ export class ServerState {
 
   // -- GraphQL/SDK mutation wrappers (thin, over the economy/ledger) ----------
 
-  mRegisterAgent(agentId: string, serviceType: string) {
+  async mRegisterAgent(agentId: string, serviceType: string) {
     this.ledger.agents.register_agent({ agent_id: agentId, owner_public_key: "01", agent_public_key: "01", service_type: serviceType as never });
-    return this.ledger.buildPassport(agentId);
+    const passport = this.ledger.buildPassport(agentId);
+    const casper_live = await casperLiveBridge().mirrorRegisterAgent({ agentId, serviceType, agentPublicKeyHex: "01" });
+    return { ...passport, casper_live };
   }
   mOpenCreditLine(agentId: string) {
     return this.economy.credit.underwrite(agentId);
@@ -809,9 +819,10 @@ export class ServerState {
   mVerifyOperator(operatorId: string, jurisdiction: string, reference: string) {
     return this.realfi.verifyOperator({ operator_id: operatorId, verification_level: "business_verified", jurisdiction, verification_reference: reference });
   }
-  mDeposit(amountCspr: number) {
+  async mDeposit(amountCspr: number) {
     this.economy.treasury.depositLiquidity(amountCspr);
-    return this.ledger.pool.poolState();
+    const casper_live = await casperLiveBridge().mirrorDepositLiquidity({ amountCspr });
+    return { ...this.ledger.pool.poolState(), casper_live };
   }
   mWithdraw(amountCspr: number) {
     try {
@@ -821,11 +832,12 @@ export class ServerState {
       return { error: (err as Error).message };
     }
   }
-  mStake(agentId: string, amountCspr: number) {
+  async mStake(agentId: string, amountCspr: number) {
     if (!this.ledger.agents.get(agentId)) return { error: "unknown agent" };
     this.ledger.agents.stake(agentId, cspr(amountCspr));
     const agent = this.ledger.agents.get(agentId)!;
-    return { agent_id: agentId, stake_motes: agent.stake.toString(), credit_explain: this.economy.credit.explain(agentId) };
+    const casper_live = await casperLiveBridge().mirrorStake({ agentId, amountCspr });
+    return { agent_id: agentId, stake_motes: agent.stake.toString(), credit_explain: this.economy.credit.explain(agentId), casper_live };
   }
   mResolveDispute(disputeId: string, verdict: string, slashCspr: number) {
     try {

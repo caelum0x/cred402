@@ -222,12 +222,58 @@ export interface X402Trace {
   report: { evidence_type: string; confidence: number; evidence_hash: string; fields?: Record<string, unknown> };
 }
 
-export async function x402Buy(evidenceType: string, tampered = false): Promise<X402Trace> {
-  const res = await fetch("/api/x402/buy", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ evidence_type: evidenceType, tampered }),
-  });
+/**
+ * Cold-start-aware fetch (STRATEGY.md's highest-leverage conversion fix): the
+ * free Render dyno backing this console can take 30-60s to wake from idle. A
+ * naive fetch just times out and reads as "broken" to a first-time visitor.
+ * This retries with backoff for up to ~70s, calling `onRetry` on every attempt
+ * after the first so the UI can show "cold start, retrying automatically…"
+ * instead of a dead error state. Once the backend is warm (the common case —
+ * see lib/services/keepalive.ts) this resolves on the first try, no UI change.
+ */
+export async function fetchColdStartAware(
+  input: RequestInfo,
+  init: RequestInit,
+  onRetry?: (attempt: number, elapsedMs: number) => void,
+): Promise<Response> {
+  const delays = [1500, 3000, 6000, 10000, 15000, 20000]; // ~56s of backoff + request time
+  const started = Date.now();
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12_000);
+      const res = await fetch(input, { ...init, signal: controller.signal });
+      clearTimeout(timeout);
+      // A cold dyno can also surface as a 502/503 from the platform while it boots.
+      if ((res.status === 502 || res.status === 503) && attempt < delays.length) {
+        throw new Error(`upstream ${res.status}`);
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= delays.length) break;
+      onRetry?.(attempt + 1, Date.now() - started);
+      await new Promise((r) => setTimeout(r, delays[attempt]));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("request failed");
+}
+
+export async function x402Buy(
+  evidenceType: string,
+  tampered = false,
+  onRetry?: (attempt: number, elapsedMs: number) => void,
+): Promise<X402Trace> {
+  const res = await fetchColdStartAware(
+    "/api/x402/buy",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ evidence_type: evidenceType, tampered }),
+    },
+    onRetry,
+  );
   return res.json();
 }
 
@@ -1202,4 +1248,72 @@ export function shortHash(h: string, n = 10): string {
 
 export function fmtTime(ts: number): string {
   return new Date(ts * 1000).toLocaleTimeString();
+}
+
+// ── p8 Casper live write-path status (home + on-chain panels) ─────────────
+
+export type CasperLiveMirrorResult =
+  | { mode: "sim"; reason: string }
+  | { mode: "live"; deploy_hash: string; explorer_url: string; status: "submitted"; convention_verified: boolean; admin_required?: boolean }
+  | { mode: "live-error"; error: string; admin_required?: boolean };
+
+export interface CasperLiveActivity {
+  at: number;
+  op: "register_agent" | "stake" | "set_credit_score" | "deposit_liquidity";
+  agent_id?: string;
+  result: CasperLiveMirrorResult;
+}
+
+export interface CasperLiveStatus {
+  live: boolean;
+  configured: boolean;
+  reachable: boolean;
+  chain?: string;
+  recent: CasperLiveActivity[];
+}
+
+export async function getCasperLiveStatus(): Promise<CasperLiveStatus> {
+  const res = await fetch("/v1/casper/live");
+  const body = (await res.json()) as { data: CasperLiveStatus };
+  return body.data;
+}
+
+// ── 90-second live proof (home page) — real score → draw → repay ──────────
+
+export interface UnderwriteResult {
+  decision: { credit_score: number; credit_line: string; interest_rate_bps: number; rationale: string[] };
+  line: { max_credit: string; drawn: string; status: string };
+}
+
+export async function openCreditLine(agentId: string): Promise<UnderwriteResult> {
+  const res = await fetch("/v1/credit/lines", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ agent_id: agentId }),
+  });
+  const body = (await res.json()) as { data?: UnderwriteResult; error?: { message?: string } };
+  if (body.error) throw new Error(body.error.message ?? "underwrite failed");
+  return body.data as UnderwriteResult;
+}
+
+export async function drawCredit(agentId: string, amountCspr: number): Promise<unknown> {
+  const res = await fetch(`/v1/credit/lines/${encodeURIComponent(agentId)}/draw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount_cspr: amountCspr }),
+  });
+  const body = (await res.json()) as { data?: unknown; error?: { message?: string } };
+  if (body.error) throw new Error(body.error.message ?? "draw failed");
+  return body.data;
+}
+
+export async function repayCredit(agentId: string, amountCspr: number): Promise<unknown> {
+  const res = await fetch(`/v1/credit/lines/${encodeURIComponent(agentId)}/repay`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount_cspr: amountCspr }),
+  });
+  const body = (await res.json()) as { data?: unknown; error?: { message?: string } };
+  if (body.error) throw new Error(body.error.message ?? "repay failed");
+  return body.data;
 }

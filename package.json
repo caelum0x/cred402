@@ -18,6 +18,8 @@
     "demo:realfi": "tsx scripts/realfi_demo.ts",
     "ship:check": "tsx scripts/ship_first_check.ts",
     "casper:health": "tsx scripts/casper_health.ts",
+    "casper:keygen": "tsx scripts/casper_keygen.ts",
+    "near:keygen": "tsx scripts/near_keygen.ts",
     "casper:sidecar": "tsx scripts/sidecar_watch.ts",
     "graphql:sdl": "tsx scripts/export_graphql_sdl.ts",
     "cli": "tsx cli/cred402.ts",

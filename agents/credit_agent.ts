@@ -7,6 +7,7 @@ import { reasonCodesFromInputs } from "../lib/core/reason_codes.js";
 import { realfiCreditSignal } from "../lib/services/realfi_credit.js";
 import { ComplianceService } from "../lib/compliance/service.js";
 import { computeTier } from "../lib/services/reputation_tiers.js";
+import { casperLiveBridge } from "../lib/casper/live_bridge.js";
 
 /**
  * CreditAgent — the underwriter. It reads an agent's x402 receipt history, runs
@@ -56,6 +57,11 @@ export class CreditAgent {
 
     const decision = this.ledger.policy.evaluate(agent);
     this.ledger.agents.set_credit_score(agent_id, decision.credit_score);
+    // Fire-and-forget live mirror: underwrite() is called synchronously from many
+    // places (demo scenes, the economy tick), so this never blocks the sim path on
+    // network latency. The real submission + result land in the bridge's activity
+    // log (GET /v1/casper/live), admin-gate failures included — see live_bridge.ts.
+    void casperLiveBridge().mirrorSetCreditScore({ agentId: agent_id, score: decision.credit_score });
     if (fraud.flags.length > 0) {
       decision.rationale.push(`fraud penalty x${fraudFactor.toFixed(2)} (${fraud.flags.map((f) => f.code).join(", ")})`);
     }

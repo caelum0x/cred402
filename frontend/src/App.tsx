@@ -30,18 +30,19 @@ import { WalletButton } from "./components/WalletButton";
 import { EventFeed } from "./components/EventFeed";
 import { Controls } from "./components/Controls";
 import { AlgorandX402Console } from "./components/AlgorandX402Console";
+import { Home } from "./components/Home";
 
-const TABS = ["Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Algorand x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "Flare", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
+const TABS = ["Home", "Analytics", "On-Chain", "Onboard", "Agents", "RWA Jobs", "Receipts", "Credit Pool", "Marketplace", "Discovery", "x402", "Algorand x402", "Network", "Risk", "Bureau", "Disputes", "Governance", "Multichain", "Flare", "RealFi", "Trust", "Compliance", "Explorer", "Developer", "Ops"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
   const { snapshot, liveEvents, connected, refresh } = useLedger();
   const manifest = useChainManifest();
-  const [tab, setTab] = useState<Tab>("Analytics");
+  const [tab, setTab] = useState<Tab>("Home");
 
   const feedEvents = liveEvents.length ? liveEvents : (snapshot?.events ?? []).slice().reverse();
   const contractIndex = useMemo(() => indexContracts(manifest), [manifest]);
-  const independentTab = tab === "Algorand x402";
+  const independentTab = tab === "Algorand x402" || tab === "Home";
   const singleColumn = tab === "On-Chain" || independentTab;
 
   return (
@@ -80,6 +81,7 @@ export function App() {
       <main className={singleColumn ? "layout single" : "layout"}>
         <section className="content">
           {!snapshot && !independentTab && <div className="empty">Loading on-chain state…</div>}
+          {tab === "Home" && <Home onEnterConsole={() => setTab("Analytics")} />}
           {tab === "Algorand x402" && (
             <AlgorandX402Console agentIds={snapshot?.agents.map((agent) => agent.agent_id) ?? []} />
           )}

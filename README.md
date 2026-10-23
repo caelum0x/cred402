@@ -212,6 +212,18 @@ All third-party code is documented in [`THIRD_PARTY.md`](THIRD_PARTY.md); the pr
 
 ## Quickstart
 
+**One command, zero config:**
+
+```bash
+docker compose up --build        # http://localhost:4021/ — sim mode, no env vars required
+# or, without Docker:
+./scripts/bootstrap.sh           # installs deps, starts API + console, seeds a demo loop
+```
+
+Both give you a running console with a seeded demo agent in under 5 minutes
+with nothing to configure. The manual path (more control, separate
+terminals) still works too:
+
 ```bash
 npm install
 
@@ -301,6 +313,15 @@ The `RiskPolicyManager` is **upgradable**: the policy hot-swaps v1 → v2 (adds 
 | Streaming events | in-process bus → SSE → dashboard + WatchdogAgent; live Sidecar feed (`lib/casper/sidecar.ts`) |
 | Odra (Rust→Wasm) | 14 contracts in `contracts/` |
 | MCP + Casper Wallet | 44-tool MCP server; real wallet connect + sign-in |
+
+## Integrations — sits on top of your payment rail
+
+Already using Skyfire, Nevermined, or raw Coinbase x402 to pay agents?
+cred402 doesn't compete with those — it's the underwriting layer none of
+them have. One plain, scoped/rate-limited call,
+`GET /v1/credit-score/:agentId` (no x402 paywall of its own), turns
+whatever payment history an agent already has into a real credit decision.
+Runnable samples per rail: [`docs/integrations/`](docs/integrations/README.md).
 
 ## Security
 
