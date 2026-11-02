@@ -10,8 +10,14 @@ owner-only (identity + a social post + the form submission).
 - [x] Buyer example: `examples/near-paid-score/typescript.ts` (+ README).
 - [x] Status/usage/attempt routes: `/v1/x402/near/status`,
       `/v1/x402/near/usage`, `/v1/x402/near/payments/:id`.
-- [x] Tests: 14 new (`test/near_x402.test.ts`), full suite 450/450 green,
-      `npm run typecheck` clean.
+- [x] Tests: 14 new (`test/near_x402.test.ts`), full suite 447/450 green
+      (3 pre-existing, unrelated `test/mcp_sdk.test.ts` failures — see
+      `HACKATHON.md`), `npm run typecheck` clean.
+- [x] Real end-to-end NEAR Testnet verification (2026-11-02): live local
+      server, real `402`/invalid-proof/underpaid-proof rejections, and one
+      genuine on-chain NEAR Testnet payment (tx
+      `C1LNxQFEaR2AQj79U9WzToiB1eY86jwzmxoHKvr9W7jk`) settled for real —
+      see "Verification" in `docs/near_x402.md`.
 - [x] `HACKATHON.md` written (what/why/how-to-run/track/NEAR tools used).
 - [x] Repo `caelum0x/cred402` confirmed **public** (`gh repo view` →
       `visibility: PUBLIC`) — already satisfied the hackathon's public-repo

@@ -244,7 +244,7 @@ npm run mcp:sdk                                  # official MCP server (Claude D
 npm run casper:sidecar                          # stream a live Casper Sidecar (set CRED402_SIDECAR_URL)
 
 # Quality gates:
-npm test                                        # 346 cases, node:test
+npm test                                        # 450 cases, node:test (447 pass; see HACKATHON.md)
 npm run typecheck
 ```
 

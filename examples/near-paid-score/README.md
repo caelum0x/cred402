@@ -63,3 +63,10 @@ Mainnet is disabled unless the endpoint is HTTPS and
 `CRED402_ALLOW_MAINNET=true` is set in addition to the Mainnet network
 choice. Cred402 never settles NEAR Mainnet payments without the operator's
 explicit `CRED402_NEAR_MAINNET_RELEASE_ACK` — see `docs/near_x402.md`.
+
+This exact flow (unpaid `402` → real signed NEAR Testnet `Transfer` →
+paid `200` → verified receipt) was confirmed live end-to-end on
+2026-11-02 against a running server and the real
+`https://rpc.testnet.near.org` endpoint — see "Verification" in
+[`docs/near_x402.md`](../../docs/near_x402.md) for the real tx hashes and
+receipt id.

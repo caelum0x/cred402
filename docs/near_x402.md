@@ -156,6 +156,71 @@ receipts use — receipt ids are a shared content hash, not chain-specific).
 - No NEP-141 (fungible token / stablecoin) pricing option yet; only native
   NEAR. Adding one is a matter of checking `FunctionCall` actions calling
   `ft_transfer` instead of `Transfer` actions in `near_finality.ts`.
+- A fake/never-broadcast transaction hash does not get a clean, fast `402`
+  rejection today — it gets a `502 x402_settlement_indeterminate`. This is
+  intentional, not a bug: NEAR Testnet's `EXPERIMENTAL_tx_status` returns
+  `TIMEOUT_ERROR`/`NOT_OBSERVED` (not `UNKNOWN_TRANSACTION`) for a
+  syntactically valid but never-seen transaction hash (confirmed live
+  against `https://rpc.testnet.near.org` on 2026-11-02 — see Verification
+  below). `near_finality.ts` only maps `UNKNOWN_TRANSACTION`/`does not
+  exist` to a clean `not_found`; anything else (including this real
+  `TIMEOUT_ERROR` shape) falls through to `unavailable`. Collapsing
+  `TIMEOUT_ERROR` into `not_found` was considered and rejected: a
+  genuinely slow-to-propagate *real* payment can hit the same RPC error,
+  and `not_found` is treated as a permanent rejection
+  (`markFailed`/`x402_settlement_rejected`, replay-blocked), which would
+  wrongly kill a legitimate pending payment. `unavailable` (indeterminate,
+  retry via `GET /v1/x402/near/payments/:attemptId`) is the safer failure
+  mode for an eventually-consistent chain and is kept as-is. Access is
+  never granted either way — this only affects how fast a garbage proof is
+  told "no."
+
+## Verification (2026-11-02, real NEAR Testnet, no mocking)
+
+Confirmed live, end to end, against a locally running server and the real
+`https://rpc.testnet.near.org` endpoint — no protocol-logic mocking; the
+only thing faked anywhere in this pass was never (RPC calls hit the real
+network):
+
+1. `GET /v1/x402/near/credit-score/:agentId` with no payment → real `402`
+   with a valid `PAYMENT-REQUIRED` header decoding to a correct x402 v2
+   challenge (`near:testnet`, `near-native`, exact configured price/payTo).
+2. A garbage `PAYMENT-SIGNATURE` → `402` / `PAYMENT-SIGNATURE could not be
+   decoded`.
+3. A well-formed signature over a real but never-broadcast tx hash → `502`
+   / `x402_settlement_indeterminate` (see the known-gap note above for why
+   this is `502` and not `402`).
+4. Two real NEAR Testnet accounts were created and funded for free via the
+   public, non-captcha faucet API `POST https://helper.testnet.near.org/
+   account` (works for named `*.testnet` subaccounts via `CreateAccount` —
+   it does **not** work for implicit/hex accounts, which only activate via
+   a direct `Transfer`, so `scripts/near_keygen.ts`'s implicit-account +
+   near-faucet.io flow is still the right owner path for a permanent
+   receiver). Test accounts used: payer `c402pmvzucvyo.testnet`, receiver
+   `c402rmvzucvyo.testnet`, 10 NEAR each.
+5. A real signed NEAR `Transfer` of exactly `10000000000000000000000`
+   yoctoNEAR (0.01 NEAR) was submitted on-chain via `near-api-js`:
+   tx hash `C1LNxQFEaR2AQj79U9WzToiB1eY86jwzmxoHKvr9W7jk`. Presenting it as
+   `PAYMENT-SIGNATURE` returned a real `200` with a valid `PAYMENT-RESPONSE`
+   header, `near_finality: "confirmed"`, 41 real confirmations, and a
+   finalized Casper-rooted receipt
+   (`0xd0f83e540ff2db873e5a0027b3e3d0af8dff76542f8b2549edc96c73315ea04a`,
+   verified independently at its own `GET
+   /v1/x402/external-receipts/:id` proof URL with `integrity.ok: true`).
+6. Replaying the exact same `PAYMENT-SIGNATURE` returned the identical
+   cached `200`/`PAYMENT-RESPONSE` — no double-settlement, no second RPC
+   call charged to the payer.
+7. A second real Transfer of only `1000000000000000000000` yoctoNEAR
+   (0.001 NEAR, below the configured 0.01 NEAR price) — tx hash
+   `G33RhcX5zSMarmkY358ANHcCVpeGGasrNmjgiiruYQdn` — was correctly rejected
+   with a real `402` / `x402_settlement_rejected` / "No Transfer action to
+   the configured receiver moved at least the expected amount of
+   yoctoNEAR", computed from the real on-chain transfer amount, not just
+   the signature's claimed amount.
+8. `GET /v1/x402/near/usage` after the real paid call reported
+   `paid_requests: 1`, `unique_payers: 1`, and the correct
+   `total_yocto`, sourced from the real settled attempt.
 
 Do not create synthetic/self-payment volume. One genuine end-to-end Testnet
-payment is more useful than fabricated traffic.
+payment is more useful than fabricated traffic. (The one above is real and
+is the only one that was ever submitted.)

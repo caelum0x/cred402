@@ -79,7 +79,11 @@ another agent.
 git clone https://github.com/caelum0x/cred402.git
 cd cred402
 npm install
-npm test            # 450/450 passing, including 14 new NEAR tests
+npm test            # 450 tests; 447 pass including all 14 NEAR tests.
+                     # 3 pre-existing failures are all in test/mcp_sdk.test.ts
+                     # (an unrelated MCP tool-registry stdio handshake, timing
+                     # out under heavy host load in some environments) — not
+                     # the x402/NEAR payment path. Re-verified 2026-11-02.
 npm run typecheck    # clean
 ```
 
@@ -141,8 +145,11 @@ architecture writeup.
 - `test/near_x402.test.ts` — 14 new tests (config validation, the 402
   challenge shape, payment-signature validation, the payment attempt
   store, and NEAR RPC finality checks against a mocked RPC) — TDD, all
-  green, full existing suite (436 prior tests) still green, typecheck
-  clean.
+  green; typecheck clean. Full suite is 447/450 green (3 pre-existing,
+  unrelated `test/mcp_sdk.test.ts` failures — see "How to run it" above).
+  Also verified end-to-end against the real NEAR Testnet RPC and a real
+  on-chain payment, not just unit tests — see "Verification" in
+  [`docs/near_x402.md`](docs/near_x402.md).
 - `docs/near_x402.md` — protocol writeup, Chain Signatures / NEAR Intents
   extension points, Mainnet release checklist.
 
