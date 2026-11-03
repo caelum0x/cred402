@@ -190,6 +190,29 @@ impl SpendGuard {
         Promise::new(seller_id).transfer(near_sdk::NearToken::from_yoctonear(amount.0))
     }
 
+    /// Admin-only: record a real repayment against `agent_id`'s outstanding
+    /// draw, reducing its global exposure by `amount` — the missing other
+    /// half of `spend_to_seller`'s draw-down, which is what turns the
+    /// approved `credit_line` from a one-shot budget into an actual
+    /// revolving credit line (the whole premise of a "credit score" for an
+    /// agent: it can draw, repay, and draw again against the same
+    /// underwritten line, not spend once and be done). Same trust model as
+    /// `request_spend_authorization`'s `metrics` argument — the admin has
+    /// independently verified a real repayment happened (e.g. against the
+    /// agent's own later x402 revenue) server-side before calling this;
+    /// this method itself moves no funds, it only updates the ledger an
+    /// agent's future `request_spend_authorization` calls are checked
+    /// against. Capped at the agent's current `outstanding` by
+    /// `ExposureBook::decrease_exposure` (never goes negative), so an
+    /// over-reported repayment cannot manufacture exposure headroom beyond
+    /// what was actually drawn.
+    pub fn repay_credit_line(&mut self, agent_id: String, amount: U128) {
+        self.only_admin();
+        require!(amount.0 > 0, "repay_credit_line requires a positive amount");
+        self.exposure.decrease_exposure(&agent_id, amount.0);
+        env::log_str(&format!("spend_guard: agent {} repaid {} yoctoNEAR against its outstanding exposure", agent_id, amount.0));
+    }
+
     /// Admin/watchdog-only (Day 6): record `count` additional disputes
     /// against `agent_id`. Crossing `scam_detection::DISPUTE_SPIKE_THRESHOLD`
     /// freezes the agent's exposure AND schedules a real `delete_key`
@@ -241,12 +264,15 @@ impl SpendGuard {
 
     /// Day 10: how much of the agent's approved credit line is still
     /// unspent — `reserved` (the portion of the original reservation not
-    /// yet moved into `outstanding` by a real `spend_to_seller` call).
-    /// `outstanding + reserved` is constant (equal to the original
-    /// reservation) once `request_spend_authorization` reserves the full
-    /// line up front, so `max_allowed - (outstanding + reserved)` is always
-    /// 0 after that point — `reserved` alone is the real "budget left to
-    /// spend" signal. This is a contract-state-level proxy for "remaining
+    /// yet moved into `outstanding` by a real `spend_to_seller` call, nor
+    /// released back by a freeze). `outstanding + reserved` was constant
+    /// (equal to the original reservation) right after
+    /// `request_spend_authorization` reserved the full line up front — but
+    /// is no longer an invariant once `repay_credit_line` (reduces
+    /// `outstanding` alone) or a freeze's reservation release (reduces
+    /// `reserved` alone) have run, so don't assume it holds generally.
+    /// `reserved` alone is still the correct "budget left to spend" signal
+    /// either way. This is a contract-state-level proxy for "remaining
     /// allowance"; nearcore's own per-key allowance counter is not readable
     /// from contract code, only enforced by it.
     pub fn remaining_allowance(&self, agent_id: String) -> Option<U128> {

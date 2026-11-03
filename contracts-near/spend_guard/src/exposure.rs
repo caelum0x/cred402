@@ -97,11 +97,14 @@ impl ExposureBook {
     }
 
     /// Release an unused reservation. Ported 1:1 from
-    /// `GlobalExposureManager.release_reservation` for API completeness;
-    /// not yet called from `lib.rs` (no spend-authorization-expiry flow
-    /// exists in this pass — a real Day 7+ follow-up, not a stub standing
-    /// in for one). Covered directly by this module's own tests below.
-    #[allow(dead_code)]
+    /// `GlobalExposureManager.release_reservation`. Called from
+    /// `scam_detection::record_dispute_spike`/`emergency_freeze` once an
+    /// agent is frozen — a frozen agent will never spend its remaining
+    /// reservation, so leaving it reserved forever would permanently lock
+    /// that capacity out of the agent's own global exposure cap (and, once
+    /// a multi-agent/shared-pool cap exists, out of every other agent's
+    /// headroom too) with no way to recover it. Covered directly by this
+    /// module's own tests below, and by `scam_detection`'s freeze tests.
     pub fn release_reservation(&mut self, agent_id: &str, amount: u128) {
         let mut e = self.must(agent_id);
         e.reserved = U128(if amount > e.reserved.0 { 0 } else { e.reserved.0 - amount });
@@ -110,11 +113,15 @@ impl ExposureBook {
     }
 
     /// A repayment was reported: reduce outstanding exposure. Ported 1:1
-    /// from `GlobalExposureManager.decrease_exposure`; not yet called from
-    /// `lib.rs` for the same reason as `release_reservation` above — this
-    /// pass's spend flow only ever activates exposure, it never has an
-    /// agent "repay" a draw. Covered directly by this module's own tests.
-    #[allow(dead_code)]
+    /// from `GlobalExposureManager.decrease_exposure`. Called from
+    /// `SpendGuard::repay_credit_line` once the admin has independently
+    /// verified a real repayment against the agent's outstanding draw —
+    /// same trust model as `request_spend_authorization`'s metrics (an
+    /// admin-verified fact, never a self-declared agent claim) — making
+    /// this a genuine revolving credit line instead of a one-shot budget:
+    /// an agent that repays frees up the same global exposure headroom a
+    /// later `request_spend_authorization` call checks against. Covered
+    /// directly by this module's own tests.
     pub fn decrease_exposure(&mut self, agent_id: &str, amount: u128) {
         let mut e = self.must(agent_id);
         e.outstanding = U128(if amount > e.outstanding.0 { 0 } else { e.outstanding.0 - amount });
