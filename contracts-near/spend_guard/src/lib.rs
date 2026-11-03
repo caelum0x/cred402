@@ -90,6 +90,16 @@ impl SpendGuard {
         metrics: AgentMetrics,
         public_key: PublicKey,
     ) -> Promise {
+        // Admin/operator-only: `metrics` is caller-supplied, and this method
+        // spends out of the contract's own pooled balance (identity
+        // sub-account funding) and lets the agent draw on it later — so it
+        // must only ever be called by the operator who has independently
+        // verified the agent's real x402 revenue server-side (reading
+        // `near_payment_attempt_store.ts`'s finalized receipts), never by an
+        // arbitrary caller self-declaring fake metrics for a free credit
+        // line. This is the AI-Security-relevant guard: without it, anyone
+        // could mint themselves a spend key against invented revenue.
+        self.only_admin();
         require!(!agent_id.is_empty(), "agent_id must not be empty");
 
         // Idempotency guard (Day 10): an agent with a live key cannot be
