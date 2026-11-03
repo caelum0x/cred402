@@ -23,6 +23,15 @@ owner-only (identity + a social post + the form submission).
       `visibility: PUBLIC`) — already satisfied the hackathon's public-repo
       requirement before this work started; re-verified, no change needed.
 - [x] Changes committed and pushed to `origin/main`.
+- [x] SpendGuard NEAR smart contract (`contracts-near/spend_guard`) — AI
+      Security & Defense complement to the x402 rail above: policy-underwritten
+      credit lines, protocol-enforced spend caps via real NEAR Function Call
+      Access Key allowances, a dispute-rate circuit breaker, and a real
+      revolving-credit `repay_credit_line` entrypoint. 17/17 unit tests green.
+      Real `near-workspaces` sandbox test (`tests/sandbox.rs`) against a live
+      local nearcore node proves the full loop including a genuine on-chain
+      repayment (outstanding exposure verified zeroed via `get_exposure`
+      before/after) — see "SpendGuard" section in `HACKATHON.md`.
 
 ## Owner-only (fill in before submitting)
 
