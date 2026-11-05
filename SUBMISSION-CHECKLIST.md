@@ -57,22 +57,28 @@ owner-only (identity + a social post + the form submission).
      `CRED402_NEAR_PAY_TO` if you want the deployed demo to actually charge
      into your own wallet instead of a disposable test account.
 
-3. **Demo video or screenshots** — the hackathon wants proof it runs. The
-   fastest path: record a ~60-90s screen capture of the "How to run it"
-   steps in `HACKATHON.md` (steps 2-4: status probe, 402 challenge, one
-   real paid call against NEAR Testnet via
-   `examples/near-paid-score/typescript.ts`). Post it to X/Twitter
-   (required by most NEAR Hackathon tracks for visibility) — this needs
-   your logged-in account, so it's not something this agent can do.
+3. **Demo post on X (required, confirmed against the real hackathon page
+   2026-11-05)** — must state you built this at NEAR HACKATHON, tag
+   `@NEARProtocol` and `#NEARHackathon`, and have a demo video or
+   screenshots attached. Fastest path: record a ~60-90s screen capture of
+   the "How to run it" steps in `HACKATHON.md` (steps 2-4: status probe,
+   402 challenge, one real paid call against NEAR Testnet via
+   `examples/near-paid-score/typescript.ts`) or run `npm run
+   demo:near-spend-guard` for the SpendGuard revolving-credit loop (draw →
+   repay → top up → draw again → freeze, proven live in this repo). This
+   needs your logged-in X account, so it's not something this agent can do.
    - Demo video/screenshot link: `[OWNER: fill in]`
-   - X/Twitter post URL: `[OWNER: fill in]`
+   - X/Twitter post URL (must tag @NEARProtocol + #NEARHackathon): `[OWNER: fill in]`
 
 4. **Submit the form** at [nearhackathon.com](https://nearhackathon.com)
-   before **Nov 14, 2026 23:59 UTC**. You'll need:
+   before **Nov 14, 2026 23:59 UTC** (results by Nov 18, 2026 23:59 UTC).
+   Confirmed fields on the real form (2026-11-05): project name, team lead
+   name + email, team size, track (up to 13 available — pick **Agent
+   Economy**), NEAR wallet address for prize distribution, repository link
+   (required), demo post link on X (required), a 20-2000 character project
+   description (the "What it does" section of `HACKATHON.md`, ~1,100
+   chars, pastes in directly), and an optional website URL.
    - Repo URL: `https://github.com/caelum0x/cred402` (public, confirmed)
-   - Track: **Agent Economy** (see `HACKATHON.md` for the one-line pitch)
-   - A short project description — the "What it does" section of
-     `HACKATHON.md` can be pasted in directly or trimmed.
    - The team info, payout account, and demo link from steps 1-3 above.
    - Submission form confirmation: `[OWNER: fill in once submitted]`
 
