@@ -35,7 +35,9 @@ export function loadSpendGuardConfig(env: NodeJS.ProcessEnv = process.env): Spen
   if (!isValidNearAccountId(contractId)) {
     return { enabled: false, reason: "CRED402_NEAR_SPEND_GUARD_CONTRACT is not a valid NEAR account id" };
   }
-  const rpcUrl = env.CRED402_NEAR_RPC_URL?.trim() || "https://rpc.testnet.near.org";
+  // See `near_networks.ts::DEFAULT_NEAR_RPC_URL` for why this defaults to
+  // FastNear rather than NEAR's own now-rate-limited legacy public RPC.
+  const rpcUrl = env.CRED402_NEAR_RPC_URL?.trim() || "https://rpc.testnet.fastnear.com";
   return { enabled: true, config: { contractId, rpcUrl } };
 }
 
@@ -122,6 +124,45 @@ export class SpendGuardClient {
       methodName: "spend_to_seller",
       args: { seller_id: args.sellerId, amount: args.amountYocto },
       gas: 15_000_000_000_000n,
+    });
+  }
+
+  /** Admin-only: record a real repayment against `agentId`'s outstanding
+   * draw, freeing that much headroom back under its global exposure cap —
+   * the other half of `spendToSeller`'s draw-down (see
+   * `contracts-near/spend_guard/src/lib.rs::repay_credit_line`). Moves no
+   * funds itself; the admin has independently verified a real repayment
+   * happened (e.g. against the agent's later x402 revenue) before calling
+   * this. */
+  async repayCreditLine(args: { agentId: string; amountYocto: string }): Promise<unknown> {
+    return this.caller.callFunction({
+      contractId: this.config.contractId,
+      methodName: "repay_credit_line",
+      args: { agent_id: args.agentId, amount: args.amountYocto },
+      gas: 30_000_000_000_000n,
+    });
+  }
+
+  /** Admin-only (added 2026-11-05): re-authorize additional spend headroom
+   * for an agent that already has a live, non-frozen key — the entrypoint
+   * that makes `repayCreditLine` an actually reachable revolving credit
+   * line end to end: draw -> repay -> top up -> draw again, on the SAME
+   * still-active key, never minting a new identity or a new public key
+   * (see `contracts-near/spend_guard/src/lib.rs::top_up_allowance`). Under
+   * the hood this re-mints the agent's existing Function Call Access Key
+   * (delete + re-add in the same receipt — nearcore refuses a second
+   * `AddKey` for an existing public key) with an allowance equal to its
+   * new total reserved headroom, capped by the agent's own
+   * policy-approved credit line. */
+  async topUpAllowance(args: { agentId: string; amountYocto: string }): Promise<unknown> {
+    return this.caller.callFunction({
+      contractId: this.config.contractId,
+      methodName: "top_up_allowance",
+      args: { agent_id: args.agentId, amount: args.amountYocto },
+      // Covers both actions in the delete+re-add receipt (see
+      // `retop_spend_key`) with the same headroom as the two-promise
+      // `requestSpendAuthorization` call above.
+      gas: 150_000_000_000_000n,
     });
   }
 

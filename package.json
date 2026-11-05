@@ -21,6 +21,7 @@
     "casper:keygen": "tsx scripts/casper_keygen.ts",
     "near:keygen": "tsx scripts/near_keygen.ts",
     "near:spend-guard:deploy": "tsx scripts/near_spend_guard_deploy.ts",
+    "near:spend-guard:redeploy": "tsx scripts/near_spend_guard_redeploy.ts",
     "demo:near-spend-guard": "tsx scripts/near_spend_guard_full_demo.ts",
     "casper:sidecar": "tsx scripts/sidecar_watch.ts",
     "graphql:sdl": "tsx scripts/export_graphql_sdl.ts",

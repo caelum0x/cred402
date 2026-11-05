@@ -107,7 +107,7 @@ impl ExposureBook {
     /// module's own tests below, and by `scam_detection`'s freeze tests.
     pub fn release_reservation(&mut self, agent_id: &str, amount: u128) {
         let mut e = self.must(agent_id);
-        e.reserved = U128(if amount > e.reserved.0 { 0 } else { e.reserved.0 - amount });
+        e.reserved = U128(e.reserved.0.saturating_sub(amount));
         e.updated_at = env::block_timestamp();
         self.exposure.insert(agent_id.to_string(), e);
     }
@@ -124,7 +124,7 @@ impl ExposureBook {
     /// directly by this module's own tests.
     pub fn decrease_exposure(&mut self, agent_id: &str, amount: u128) {
         let mut e = self.must(agent_id);
-        e.outstanding = U128(if amount > e.outstanding.0 { 0 } else { e.outstanding.0 - amount });
+        e.outstanding = U128(e.outstanding.0.saturating_sub(amount));
         e.updated_at = env::block_timestamp();
         self.exposure.insert(agent_id.to_string(), e);
     }
@@ -199,6 +199,41 @@ mod tests {
         assert_eq!(e.outstanding.0, 40);
         b.decrease_exposure("a1", 40);
         let e = b.get("a1").unwrap();
+        assert_eq!(e.outstanding.0, 0);
+    }
+
+    /// The ledger-level proof behind `SpendGuard::top_up_allowance`: a full
+    /// draw against the whole cap, followed by a full repayment, must free
+    /// up exactly enough headroom for `reserve_exposure` to accept a second
+    /// full-cap reservation — "draw -> repay -> draw again" at the
+    /// `ExposureBook` layer, the same calls `top_up_allowance` makes.
+    #[test]
+    fn repay_then_reserve_again_reaches_full_cap_a_second_time() {
+        let mut b = book();
+        b.ensure_agent("a1", 100);
+        b.reserve_exposure("a1", 100);
+        b.activate_exposure("a1", 100);
+        let e = b.get("a1").unwrap();
+        assert_eq!(e.reserved.0, 0);
+        assert_eq!(e.outstanding.0, 100);
+
+        // Without a repayment, reserving again must still refuse (no headroom).
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut b2 = book();
+            b2.ensure_agent("a1", 100);
+            b2.reserve_exposure("a1", 100);
+            b2.activate_exposure("a1", 100);
+            b2.reserve_exposure("a1", 1);
+        }));
+        assert!(result.is_err(), "no headroom exists until a repayment frees it");
+
+        b.decrease_exposure("a1", 100);
+        let e = b.get("a1").unwrap();
+        assert_eq!(e.outstanding.0, 0);
+
+        // Now the full cap is reservable again — the "top up" / "draw again" step.
+        let e = b.reserve_exposure("a1", 100);
+        assert_eq!(e.reserved.0, 100);
         assert_eq!(e.outstanding.0, 0);
     }
 

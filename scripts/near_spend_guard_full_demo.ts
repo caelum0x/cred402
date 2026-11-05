@@ -1,14 +1,16 @@
 /**
  * near_spend_guard_full_demo.ts — Day 11's "one command a judge can run"
  * for the SpendGuard contract: builds the real contract wasm, runs the
- * full automated test pass (14 Rust unit tests + a near-workspaces sandbox
+ * full automated test pass (18 Rust unit tests + a near-workspaces sandbox
  * integration test exercising the ENTIRE loop — earn, policy, a capped
- * spend key, real spends, a genuine nearcore allowance rejection, a
- * dispute spike, a freeze, and a genuine nearcore deleted-key rejection —
- * against a real local nearcore node, zero manual steps), then, if a real
- * Testnet deploy already exists (`scripts/near_spend_guard_deploy.ts`),
- * runs a small real end-to-end loop against the LIVE deployed contract on
- * NEAR Testnet as a bonus live artifact.
+ * spend key, real spends, a genuine nearcore allowance rejection, a real
+ * repay + top-up that lets the SAME still-active key draw again, a dispute
+ * spike, a freeze, and a genuine nearcore deleted-key rejection — against a
+ * real local nearcore node, zero manual steps), then, if a real Testnet
+ * deploy already exists (`scripts/near_spend_guard_deploy.ts`), runs a
+ * small real end-to-end loop against the LIVE deployed contract on NEAR
+ * Testnet as a bonus live artifact — including the same real
+ * repay/top-up/draw-again revolving-credit proof, on the public network.
  *
  *   npm run demo:near-spend-guard
  */
@@ -71,6 +73,31 @@ async function runLiveTestnetLoop(): Promise<void> {
   const spendResults = await agent.spendRepeatedly(seller, "1", 25);
   console.log("real spend attempts:", spendResults);
 
+  // ---- real repay -> top up -> draw again, against the LIVE deployed
+  // contract (not just the local sandbox) — the revolving-credit loop
+  // added 2026-11-05. Repay exactly what was actually spent, then restore
+  // that same headroom on the agent's SAME still-active key. ----
+  const successfulSpends = spendResults.filter((r) => r.success).length;
+  if (successfulSpends > 0) {
+    console.log(`\nRepaying ${successfulSpends} yoctoNEAR of real outstanding exposure for ${agentId}...`);
+    await adminClient.repayCreditLine({ agentId, amountYocto: String(successfulSpends) });
+    const exposureAfterRepay = await adminClient.getExposure(agentId);
+    console.log("exposure after real repay:", exposureAfterRepay);
+
+    console.log(`Topping up ${agentId} by the same ${successfulSpends} yoctoNEAR on its SAME live key...`);
+    await adminClient.topUpAllowance({ agentId, amountYocto: String(successfulSpends) });
+    const exposureAfterTopUp = await adminClient.getExposure(agentId);
+    console.log("exposure after real top-up:", exposureAfterTopUp);
+
+    const postTopUpSpend = await agent.spendRepeatedly(seller, "1", 1);
+    console.log("real spend after top-up (must succeed, on the ORIGINAL key):", postTopUpSpend);
+    if (!postTopUpSpend[0]?.success) {
+      throw new Error("a spend after a real top_up_allowance must succeed on the live network's same key");
+    }
+  } else {
+    console.log("\n(No successful spends to repay/top up this run — skipping the revolving-credit bonus step.)");
+  }
+
   const scammerId = `demo-scammer-${Date.now()}`;
   const scammer = new NearSpendControlledBuyerAgent(config, scammerId);
   await scammer.getAuthorized(adminClient, {
@@ -97,7 +124,8 @@ async function runLiveTestnetLoop(): Promise<void> {
     contract: credentials.account_id,
     rpc: credentials.rpc_url,
     buyer_credit_line: record?.credit_line,
-    real_spends: spendResults.filter((r) => r.success).length,
+    real_spends: successfulSpends,
+    revolving_credit_proved: successfulSpends > 0,
     scammer_frozen: await watchdog.isFrozen(scammerId),
   });
 }

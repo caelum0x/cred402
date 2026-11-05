@@ -29,7 +29,10 @@ import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { Account, JsonRpcProvider, KeyPair } from "near-api-js";
 
-const RPC_URL = process.env.CRED402_NEAR_RPC_URL?.trim() || "https://rpc.testnet.near.org";
+// See `lib/x402/near_networks.ts::DEFAULT_NEAR_RPC_URL` for why this
+// defaults to FastNear rather than NEAR's own now-rate-limited legacy
+// public RPC (`rpc.testnet.near.org`, confirmed live 2026-11-05).
+const RPC_URL = process.env.CRED402_NEAR_RPC_URL?.trim() || "https://rpc.testnet.fastnear.com";
 const FAUCET_URL = "https://helper.testnet.near.org/account";
 const SECRETS_DIR = join(process.cwd(), ".secrets");
 const OUT_PATH = join(SECRETS_DIR, "near_spend_guard_credentials.json");

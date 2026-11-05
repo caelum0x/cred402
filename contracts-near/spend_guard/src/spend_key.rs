@@ -9,8 +9,8 @@
 //! The plan this module implements originally called for minting the key
 //! directly on a brand-new `agent-<id>.<spendguard>.testnet` sub-account.
 //! That is exactly right for *issuing* the key: NEAR allows `CreateAccount`
-//! + `AddKey` in the SAME action batch/receipt, because at that instant the
-//! creating contract is the new account's only authority.
+//! together with `AddKey` in the SAME action batch/receipt, because at that
+//! instant the creating contract is the new account's only authority.
 //!
 //! It breaks down for Day 6's *revocation* step. Once a sub-account exists
 //! independently, NEAR's runtime only allows `AddKey` / `DeleteKey` /
@@ -90,6 +90,37 @@ pub fn mint_spend_key(public_key: PublicKey, credit_line_yocto: u128) -> Promise
 /// validation step, before this contract's code ever runs again.
 pub fn revoke_spend_key(public_key: PublicKey) -> Promise {
     Promise::new(env::current_account_id()).delete_key(public_key)
+}
+
+/// Re-mint (replace) an agent's EXISTING, still-active spend key with a new
+/// allowance — what `SpendGuard::top_up_allowance` calls after
+/// `ExposureBook::reserve_exposure` restores headroom a repayment freed.
+///
+/// A real NEAR protocol constraint discovered while building this and
+/// confirmed live against a running local nearcore node (`tests/sandbox.rs`):
+/// unlike a brand-new key, `AddKey` for a public key that ALREADY EXISTS on
+/// the account is unconditionally rejected —
+/// `ActionError::AddKeyAlreadyExists` — there is no "update an access key's
+/// allowance" action in the NEAR protocol. So topping up means delete-then-
+/// readd, not add-again. Both actions target this same contract account in
+/// the SAME receipt (same-account self-actions, which nearcore always
+/// permits to run in order within one receipt — see the module docs above
+/// on why the spend key lives on this contract's own account at all), so
+/// the key is never actually missing from any OTHER transaction's point of
+/// view: nearcore applies both actions atomically within this one receipt
+/// before any other transaction signed by that key could be included in a
+/// later block.
+pub fn retop_spend_key(public_key: PublicKey, new_allowance_yocto: u128) -> Promise {
+    let allowance = Allowance::limited(NearToken::from_yoctonear(new_allowance_yocto))
+        .unwrap_or_else(|| env::panic_str("top-up allowance must be greater than zero"));
+    Promise::new(env::current_account_id())
+        .delete_key(public_key.clone())
+        .add_access_key_allowance(
+            public_key,
+            allowance,
+            env::current_account_id(),
+            SPEND_METHOD.to_string(),
+        )
 }
 
 #[cfg(test)]

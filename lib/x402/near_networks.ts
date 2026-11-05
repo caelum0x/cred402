@@ -21,9 +21,15 @@ export const NEAR_MAINNET_NETWORK = "near:mainnet" as const;
 export type NearNetworkId = typeof NEAR_TESTNET_NETWORK | typeof NEAR_MAINNET_NETWORK;
 export type NearNetworkName = "testnet" | "mainnet";
 
+// `rpc.testnet.near.org` / `rpc.mainnet.near.org` are NEAR's own legacy
+// public endpoints; found live (2026-11-05) to now reject most calls with
+// `-429 "WARNING! THIS ENDPOINT IS DEPRECATED!"`, pointing callers at
+// FastNear's free public RPC instead. Defaulting to FastNear here means a
+// judge running this with no `CRED402_NEAR_RPC_URL` override does not hit
+// that same rate limit. `CRED402_NEAR_RPC_URL` still overrides either way.
 export const DEFAULT_NEAR_RPC_URL: Record<NearNetworkName, string> = {
-  testnet: "https://rpc.testnet.near.org",
-  mainnet: "https://rpc.mainnet.near.org",
+  testnet: "https://rpc.testnet.fastnear.com",
+  mainnet: "https://rpc.mainnet.fastnear.com",
 };
 
 const MAINNET_ALIASES: readonly string[] = ["mainnet", NEAR_MAINNET_NETWORK];

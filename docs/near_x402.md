@@ -60,7 +60,7 @@ holding NEAR directly. This is deliberately left as the extension point
 ```bash
 export CRED402_NEAR_PAY_TO=cred402.testnet
 export CRED402_NEAR_NETWORK=testnet
-export CRED402_NEAR_RPC_URL=https://rpc.testnet.near.org
+export CRED402_NEAR_RPC_URL=https://rpc.testnet.fastnear.com   # near.org's own public RPC now rate-limits (-429 deprecated), confirmed live 2026-11-05 — use FastNear
 export CRED402_NEAR_PRICE_YOCTO=10000000000000000000000   # 0.01 NEAR
 export CRED402_NEAR_MIN_FINALITY_BLOCKS=2
 export CRED402_DATA_DIR=/var/lib/cred402

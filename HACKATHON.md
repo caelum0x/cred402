@@ -96,14 +96,23 @@ permission, not just an application-level check.
   **revolving** credit line: an admin-verified repayment reduces the
   agent's outstanding exposure, the other half of a real credit score for
   an agent (draw, repay, draw again), not a one-shot budget.
+- `top_up_allowance` (added 2026-11-05) closes the loop end to end: it
+  re-reserves exactly the headroom a repayment freed (capped by the
+  agent's own policy-approved `max_allowed`, never more) and re-mints the
+  SAME still-active Function Call Access Key with a fresh on-chain
+  allowance — so an agent can draw, repay, top up, and draw again on one
+  continuously-live key, never needing a new identity or a new key.
 
 **Real, live proof, not unit tests in isolation:** `tests/sandbox.rs` is a
 `near-workspaces` integration test against a genuinely running local
 nearcore node — deploy → policy → capped spend key → real spends → a real
 on-chain `repay_credit_line` call with before/after `get_exposure` proof
-that outstanding exposure actually zeroes out on the live contract → a
-dispute spike → circuit-breaker freeze → the revoked key's next call
-rejected by nearcore itself, even with budget left. Run it with:
+that outstanding exposure actually zeroes out on the live contract → a real
+on-chain `top_up_allowance` call that restores exactly that freed headroom
+and re-mints the agent's original key → a real `spend_to_seller` call that
+succeeds again on that SAME key, past the point its original allowance was
+exhausted → a dispute spike → circuit-breaker freeze → the revoked key's
+next call rejected by nearcore itself, even with budget left. Run it with:
 
 ```bash
 cd contracts-near/spend_guard
@@ -111,15 +120,37 @@ cargo near build non-reproducible-wasm
 cargo test --test sandbox -- --nocapture
 ```
 
-**Known, honestly-scoped limit** (found while proving the repay path, not
-hidden): `repay_credit_line` genuinely frees exposure headroom at the
-ledger level, but no public entrypoint yet lets an agent with a still-ACTIVE
-key draw against that freed headroom in the same authorization — the only
-way a key becomes inactive today (`report_dispute_spike`/
-`emergency_freeze`) also permanently freezes the exposure record, which
-`reserve_exposure` then refuses forever. A real `top_up_allowance`-style
-admin entrypoint (re-running `reserve_exposure` for an agent that is
-`key_active && !frozen`) is the genuine next step, not attempted here.
+**A real NEAR protocol constraint found while building `top_up_allowance`**
+(not hidden, not worked around): nearcore's `AddKey` action unconditionally
+rejects a public key that already exists on the account
+(`ActionError::AddKeyAlreadyExists`, confirmed live against a running local
+nearcore node) — there is no "update an access key's allowance" action in
+the protocol. So topping up an existing key means `delete_key` then
+`add_access_key_allowance` **in the same receipt** (same-account
+self-actions, which nearcore always applies atomically and in order), not
+a second `AddKey` call. See `spend_key::retop_spend_key`.
+
+**Also re-verified against the real, already-deployed public NEAR Testnet
+contract** (`spendguard-024e8dd6f7.testnet`, upgraded in place via `npm run
+near:spend-guard:redeploy` — a `DeployContract` action replaces code only,
+never storage, so every prior agent/exposure record survived untouched):
+25/25 real `spend_to_seller` calls, a real `repay_credit_line` call, a real
+`top_up_allowance` call that restored the exact freed headroom, one more
+real `spend_to_seller` call that succeeded on that SAME original key, a
+dispute spike, a freeze, and a rejected post-freeze call — all against the
+live public network, not just the local sandbox. Run it yourself with `npm
+run demo:near-spend-guard` (needs `.secrets/near_spend_guard_credentials.json`
+from a prior `npm run near:spend-guard:deploy`).
+
+**A second real, judge-relevant finding from this same run:** NEAR's own
+legacy public RPC (`rpc.testnet.near.org`) now rejects most calls with
+`-429 "WARNING! THIS ENDPOINT IS DEPRECATED!"`. Every default RPC URL in
+this repo (`lib/x402/near_networks.ts`, `near_spend_guard_client.ts`,
+`scripts/near_spend_guard_deploy.ts`) now defaults to FastNear's free
+public RPC (`rpc.testnet.fastnear.com`) instead — `CRED402_NEAR_RPC_URL`
+still overrides either way. If you cloned this repo before 2026-11-05 and
+hit a `-429` running the "How to run it" steps below, pull latest or set
+`CRED402_NEAR_RPC_URL=https://rpc.testnet.fastnear.com` yourself.
 
 ## How to run it (for judges)
 
@@ -127,11 +158,12 @@ admin entrypoint (re-running `reserve_exposure` for an agent that is
 git clone https://github.com/caelum0x/cred402.git
 cd cred402
 npm install
-npm test            # 450 tests; 447 pass including all 14 NEAR tests.
-                     # 3 pre-existing failures are all in test/mcp_sdk.test.ts
-                     # (an unrelated MCP tool-registry stdio handshake, timing
-                     # out under heavy host load in some environments) — not
-                     # the x402/NEAR payment path. Re-verified 2026-11-02.
+npm test            # 450/450 green, including all 14 NEAR tests. (A
+                     # test/mcp_sdk.test.ts stdio-handshake test has
+                     # intermittently timed out under heavy host load in
+                     # some environments in the past — unrelated to the
+                     # x402/NEAR payment path either way.) Re-verified
+                     # 2026-11-05, 450/450.
 npm run typecheck    # clean
 ```
 
@@ -193,9 +225,8 @@ architecture writeup.
 - `test/near_x402.test.ts` — 14 new tests (config validation, the 402
   challenge shape, payment-signature validation, the payment attempt
   store, and NEAR RPC finality checks against a mocked RPC) — TDD, all
-  green; typecheck clean. Full suite is 447/450 green (3 pre-existing,
-  unrelated `test/mcp_sdk.test.ts` failures — see "How to run it" above).
-  Also verified end-to-end against the real NEAR Testnet RPC and a real
+  green; typecheck clean. Full suite is 450/450 green (see "How to run it"
+  above). Also verified end-to-end against the real NEAR Testnet RPC and a real
   on-chain payment, not just unit tests — see "Verification" in
   [`docs/near_x402.md`](docs/near_x402.md).
 - `docs/near_x402.md` — protocol writeup, Chain Signatures / NEAR Intents
@@ -205,7 +236,7 @@ Existing Algorand (`examples/algorand-paid-score/`, `/v1/x402/algorand/*`)
 and QIE (`/v1/x402/qie/*`) integrations are untouched.
 
 - `contracts-near/spend_guard/` — the SpendGuard contract (`policy.rs`,
-  `exposure.rs`, `spend_key.rs`, `scam_detection.rs`, `lib.rs`), 17/17 unit
+  `exposure.rs`, `spend_key.rs`, `scam_detection.rs`, `lib.rs`), 18/18 unit
   tests green, plus `tests/sandbox.rs`, a real `near-workspaces` sandbox
-  integration test proving the full earn→spend→repay→freeze loop against
-  a genuinely running local nearcore node.
+  integration test proving the full earn→spend→repay→top-up→spend→freeze
+  loop against a genuinely running local nearcore node.

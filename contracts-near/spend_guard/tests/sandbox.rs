@@ -1,10 +1,12 @@
-//! Day 2 + Day 11 + Day 14 — a real near-workspaces sandbox integration test
-//! exercising the ENTIRE SpendGuard loop against a genuinely running local
-//! nearcore node (not a mock): deploy -> policy evaluation -> capped spend
-//! key -> real spends -> allowance exhaustion rejected by nearcore itself ->
-//! a REAL on-chain repayment against outstanding exposure -> a dispute
-//! spike trips the circuit breaker -> the revoked key is rejected by
-//! nearcore itself, even with budget left. Zero manual steps:
+//! Day 2 + Day 11 + Day 14 (+ Nov-5 top-up follow-up) — a real
+//! near-workspaces sandbox integration test exercising the ENTIRE SpendGuard
+//! loop against a genuinely running local nearcore node (not a mock):
+//! deploy -> policy evaluation -> capped spend key -> real spends ->
+//! allowance exhaustion rejected by nearcore itself -> a REAL on-chain
+//! repayment against outstanding exposure -> a REAL `top_up_allowance`
+//! re-reservation + key re-mint that lets the SAME still-active key draw
+//! again -> a dispute spike trips the circuit breaker -> the revoked key is
+//! rejected by nearcore itself, even with budget left. Zero manual steps:
 //! `cargo test --test sandbox` (after `cargo near build non-reproducible-wasm`,
 //! wired together as `npm run demo:near-spend-guard` from the repo root —
 //! see `package.json`) is the one command a judge needs to run.
@@ -256,24 +258,55 @@ async fn full_spend_guard_loop_earn_policy_cap_spend_dispute_freeze_reject() -> 
         agent_id, repay_amount, outstanding_before
     );
 
-    // Honest architectural limit, found while building this proof (not
-    // worked around, not hidden): `repay_credit_line` genuinely frees
-    // `max_allowed` headroom at the `ExposureBook` level (see
-    // `exposure.rs::decrease_exposure`/`reserve_exposure`, and the existing
-    // unit test `activate_then_decrease_moves_reserved_into_outstanding_then_back_down`),
-    // but there is currently NO public `SpendGuard` entrypoint that lets an
-    // agent with a still-ACTIVE key draw against that freed headroom again
-    // in the same authorization: `request_spend_authorization`'s own
-    // idempotency guard refuses to re-run for any agent whose key is still
-    // `key_active`, and the only way `key_active` ever becomes `false` today
-    // is `report_dispute_spike`/`emergency_freeze` — both of which ALSO set
-    // `frozen = true` on the exposure record permanently, and
-    // `reserve_exposure` unconditionally refuses any frozen agent forever.
-    // So "repay, then draw more on the same live key" is real at the ledger
-    // level but not yet reachable through any public method end to end — a
-    // genuine follow-up (e.g. a `top_up_allowance` admin call that re-runs
-    // `reserve_exposure` for an agent that is `key_active && !frozen`), not
-    // faked here as a passing assertion against code that doesn't exist.
+    // ---- top up: the previously-missing other half, now real end to end.
+    // `repay_credit_line` above freed `successful_spends` yoctoNEAR of
+    // headroom at the ExposureBook level. `top_up_allowance` re-reserves
+    // exactly that much AND re-mints the agent's SAME live key (same public
+    // key, same identity, never revoked) with a fresh on-chain allowance —
+    // proving "draw -> repay -> top up -> draw again" on one still-active
+    // key is real, not just a ledger fact in isolation. ----
+    let top_up_outcome = admin
+        .call(contract.id(), "top_up_allowance")
+        .args_json(json!({ "agent_id": agent_id, "amount": repay_amount.to_string() }))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(top_up_outcome.is_success(), "top_up_allowance failed: {:#?}", top_up_outcome.failures());
+
+    let exposure_after_top_up: serde_json::Value = contract
+        .view("get_exposure")
+        .args_json(json!({ "agent_id": agent_id }))
+        .await?
+        .json()?;
+    let reserved_after_top_up: u128 = exposure_after_top_up["reserved"].as_str().unwrap().parse().unwrap();
+    assert_eq!(
+        reserved_after_top_up,
+        reserved_after_repay + repay_amount,
+        "top_up_allowance must restore exactly the headroom the repayment freed"
+    );
+    assert_eq!(exposure_after_top_up["frozen"], false);
+    println!(
+        "TOP-UP VERIFIED LIVE: agent {} reserved {} -> {} yoctoNEAR on the same still-active key",
+        agent_id, reserved_after_repay, reserved_after_top_up
+    );
+
+    // The real proof this is reachable, not just a ledger number: the SAME
+    // secret key (never rotated, never revoked) can spend again, past the
+    // point where its original gas allowance was exhausted, because
+    // top_up_allowance re-minted that exact public key with a fresh
+    // allowance equal to its restored `reserved` headroom.
+    let post_top_up_spend = agent_as_contract
+        .call(contract.id(), "spend_to_seller")
+        .args_json(json!({ "seller_id": seller.id(), "amount": spend_amount.to_string() }))
+        .gas(SPEND_GAS)
+        .transact()
+        .await?;
+    assert!(
+        post_top_up_spend.is_success(),
+        "a spend after top_up_allowance must succeed on the SAME still-active key: {:#?}",
+        post_top_up_spend.failures()
+    );
+    println!("DRAW-AGAIN VERIFIED LIVE: agent {} spent again on its original key after top_up_allowance", agent_id);
 
     // ---- dispute spike -> circuit breaker freezes exposure AND revokes the key ----
     let second_agent_id = "demo-scammer-agent";

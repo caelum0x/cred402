@@ -88,7 +88,11 @@ test("NEAR config is fail-closed without a pay-to account", () => {
 
   const safeTestnet = config("testnet");
   assert.equal(safeTestnet.network, NEAR_TESTNET_NETWORK);
-  assert.equal(safeTestnet.rpcUrl, "https://rpc.testnet.near.org");
+  // Default changed 2026-11-05: NEAR's own legacy public RPC
+  // (rpc.testnet.near.org) now rejects most calls with a real, live
+  // `-429 "WARNING! THIS ENDPOINT IS DEPRECATED!"` — see
+  // lib/x402/near_networks.ts::DEFAULT_NEAR_RPC_URL.
+  assert.equal(safeTestnet.rpcUrl, "https://rpc.testnet.fastnear.com");
 
   const safeMainnet = config("mainnet");
   assert.equal(safeMainnet.network, NEAR_MAINNET_NETWORK);

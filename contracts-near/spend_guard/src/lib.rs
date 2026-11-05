@@ -213,6 +213,61 @@ impl SpendGuard {
         env::log_str(&format!("spend_guard: agent {} repaid {} yoctoNEAR against its outstanding exposure", agent_id, amount.0));
     }
 
+    /// Admin-only: the entrypoint that was missing to make
+    /// `repay_credit_line` an actually reachable revolving credit line, not
+    /// just a ledger fact proven in isolation (see `HACKATHON.md`'s
+    /// previously "Known, honestly-scoped limit" and `tests/sandbox.rs`).
+    /// Re-authorizes additional spend headroom for an agent that already has
+    /// a live, non-frozen key — draw -> repay -> top up -> draw again, on
+    /// the SAME still-active key, never minting a new identity sub-account
+    /// or a new public key.
+    ///
+    /// Two things happen, both required for "draw again" to be real:
+    /// 1. `ExposureBook::reserve_exposure` — the SAME global-cap-checked
+    ///    reservation `request_spend_authorization` uses, so a top-up can
+    ///    never push the agent's `reserved + outstanding` past its own
+    ///    policy-approved `max_allowed` — an admin can only ever restore
+    ///    headroom a real repayment freed, never mint unlimited credit.
+    /// 2. Re-mints the agent's live Function Call Access Key (delete, then
+    ///    re-add in the same receipt — see `spend_key::retop_spend_key` for
+    ///    why: nearcore flatly refuses `AddKey` for a public key that
+    ///    already exists) with an allowance equal to its new total
+    ///    `reserved` headroom — the only way to actually raise the
+    ///    protocol-enforced gas budget `spend_to_seller` draws down,
+    ///    keeping the real on-chain key in lockstep with
+    ///    `ExposureBook.reserved` instead of letting the two silently drift
+    ///    apart.
+    pub fn top_up_allowance(&mut self, agent_id: String, amount: U128) -> Promise {
+        self.only_admin();
+        require!(amount.0 > 0, "top_up_allowance requires a positive amount");
+
+        let record = self
+            .agents
+            .get(&agent_id)
+            .cloned()
+            .unwrap_or_else(|| env::panic_str("unknown agent_id"));
+        require!(
+            record.key_active,
+            "top_up_allowance requires the agent's spend key to still be active; a revoked \
+             agent must be re-authorized via request_spend_authorization instead"
+        );
+
+        let exposure = self
+            .exposure
+            .get(&agent_id)
+            .unwrap_or_else(|| env::panic_str("exposure record missing for a known agent"));
+        require!(!exposure.frozen, "cannot top up a frozen agent's exposure");
+
+        let updated = self.exposure.reserve_exposure(&agent_id, amount.0);
+
+        env::log_str(&format!(
+            "spend_guard: agent {} topped up by {} yoctoNEAR; reserved now {}",
+            agent_id, amount.0, updated.reserved.0
+        ));
+
+        spend_key::retop_spend_key(record.public_key, updated.reserved.0)
+    }
+
     /// Admin/watchdog-only (Day 6): record `count` additional disputes
     /// against `agent_id`. Crossing `scam_detection::DISPUTE_SPIKE_THRESHOLD`
     /// freezes the agent's exposure AND schedules a real `delete_key`

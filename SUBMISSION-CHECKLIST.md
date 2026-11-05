@@ -10,9 +10,8 @@ owner-only (identity + a social post + the form submission).
 - [x] Buyer example: `examples/near-paid-score/typescript.ts` (+ README).
 - [x] Status/usage/attempt routes: `/v1/x402/near/status`,
       `/v1/x402/near/usage`, `/v1/x402/near/payments/:id`.
-- [x] Tests: 14 new (`test/near_x402.test.ts`), full suite 447/450 green
-      (3 pre-existing, unrelated `test/mcp_sdk.test.ts` failures — see
-      `HACKATHON.md`), `npm run typecheck` clean.
+- [x] Tests: 14 new (`test/near_x402.test.ts`), full suite 450/450 green
+      (re-verified 2026-11-05), `npm run typecheck` clean.
 - [x] Real end-to-end NEAR Testnet verification (2026-11-02): live local
       server, real `402`/invalid-proof/underpaid-proof rejections, and one
       genuine on-chain NEAR Testnet payment (tx
@@ -27,11 +26,15 @@ owner-only (identity + a social post + the form submission).
       Security & Defense complement to the x402 rail above: policy-underwritten
       credit lines, protocol-enforced spend caps via real NEAR Function Call
       Access Key allowances, a dispute-rate circuit breaker, and a real
-      revolving-credit `repay_credit_line` entrypoint. 17/17 unit tests green.
-      Real `near-workspaces` sandbox test (`tests/sandbox.rs`) against a live
-      local nearcore node proves the full loop including a genuine on-chain
-      repayment (outstanding exposure verified zeroed via `get_exposure`
-      before/after) — see "SpendGuard" section in `HACKATHON.md`.
+      revolving-credit `repay_credit_line` + `top_up_allowance` pair.
+      18/18 unit tests green. Real `near-workspaces` sandbox test
+      (`tests/sandbox.rs`) against a live local nearcore node proves the
+      full loop end to end: draw → real on-chain repayment (outstanding
+      exposure verified zeroed via `get_exposure` before/after) → real
+      on-chain top-up that restores exactly the freed headroom and
+      re-mints the SAME still-active key → a real spend that succeeds
+      again on that key → dispute spike → freeze → revoked-key rejection
+      — see "SpendGuard" section in `HACKATHON.md`.
 
 ## Owner-only (fill in before submitting)
 
