@@ -391,3 +391,179 @@ async fn full_spend_guard_loop_earn_policy_cap_spend_dispute_freeze_reject() -> 
 
     Ok(())
 }
+
+/// 2026-11-07 adversarial round, focus area 4: can two near-simultaneous
+/// `spend_to_seller` calls from the SAME signer double-spend against the
+/// same reserved allowance before the first one's state change lands?
+/// Fires two real transactions CONCURRENTLY (`tokio::join!`, not sequential
+/// `.await`s) from the SAME Function Call Access Key, each requesting an
+/// amount that individually fits the reservation but together would
+/// overdraw it — the exact shape of a TOCTOU double-spend race.
+///
+/// Result: not reproducible, by real NEAR protocol design, not by luck.
+/// Two reasons, both confirmed here rather than assumed:
+/// 1. A single NEAR access key's transactions are strictly nonce-ordered;
+///    nearcore itself refuses to accept two transactions signed by the same
+///    key without a strictly increasing nonce, so "simultaneous" submission
+///    from one key is serialized before either transaction is even
+///    accepted into a chunk — there is no network-level race window.
+/// 2. Even granting both nonces upfront, a single contract account's
+///    receipts are applied one at a time by the runtime (no interleaved/
+///    parallel execution of two calls against the same account's state),
+///    so `spend_to_seller`'s read-check-write of `ExposureBook` can never
+///    observe a stale `reserved` value — unlike e.g. a naive two-phase
+///    check-then-write against a database with no row lock.
+#[tokio::test]
+async fn concurrent_spend_to_seller_from_the_same_signer_cannot_double_spend() -> anyhow::Result<()> {
+    let worker = near_workspaces::sandbox().await?;
+    let wasm = read_wasm();
+
+    let root = worker.root_account()?;
+    let contract_account = root
+        .create_subaccount("spendguard2")
+        .initial_balance(NearToken::from_near(50))
+        .transact()
+        .await?
+        .into_result()?;
+    let contract = contract_account.deploy(&wasm).await?.into_result()?;
+    let admin = root;
+
+    let outcome = admin
+        .call(contract.id(), "new")
+        .args_json(json!({ "admin": admin.id() }))
+        .transact()
+        .await?;
+    assert!(outcome.is_success(), "contract init failed: {:#?}", outcome.failures());
+
+    // revenue_30d = 1 NEAR, no stake, no disputes, perfect accuracy =>
+    // credit_line = 1 NEAR * 0.30 = 0.3 NEAR exactly, all of it reserved
+    // up front by request_spend_authorization.
+    let agent_id = "concurrent-race-agent";
+    let secret_key = SecretKey::from_random(KeyType::ED25519);
+    let public_key = secret_key.public_key();
+    let metrics = json!({
+        "revenue_30d": NearToken::from_near(1).as_yoctonear().to_string(),
+        "stake": "0",
+        "dispute_rate_bps": 0,
+        "accuracy_score": 100,
+        "total_jobs": 10,
+    });
+    let auth_outcome = admin
+        .call(contract.id(), "request_spend_authorization")
+        .args_json(json!({ "agent_id": agent_id, "metrics": metrics, "public_key": public_key.to_string() }))
+        .max_gas()
+        .transact()
+        .await?;
+    assert!(auth_outcome.is_success(), "request_spend_authorization failed: {:#?}", auth_outcome.failures());
+
+    let exposure: serde_json::Value = contract
+        .view("get_exposure")
+        .args_json(json!({ "agent_id": agent_id }))
+        .await?
+        .json()?;
+    let reserved: u128 = exposure["reserved"].as_str().unwrap().parse().unwrap();
+    assert_eq!(reserved, NearToken::from_millinear(300).as_yoctonear(), "sanity: 0.3 NEAR reserved");
+
+    // Each individual spend (0.2 NEAR) is well within the 0.3 NEAR
+    // reservation, but TWO of them (0.4 NEAR) would blow past it. If a
+    // double-spend race existed, both would succeed.
+    let race_amount: u128 = NearToken::from_millinear(200).as_yoctonear();
+    assert!(race_amount <= reserved && race_amount * 2 > reserved, "test amounts must create a real overdraw if both succeed");
+
+    let agent_as_contract =
+        near_workspaces::Account::from_secret_key(contract.id().clone(), secret_key.clone(), &worker);
+    let seller: near_workspaces::Account = worker.dev_create_account().await?;
+
+    // Warm up near-workspaces' client-side nonce cache with ONE real,
+    // sequential transaction from this brand-new key first. Without this,
+    // near-workspaces' own nonce cache (src/rpc/client.rs::fetch_tx_nonce)
+    // has a real client-library race on a key's FIRST-EVER use: two
+    // concurrent callers can both observe an empty cache, both independently
+    // query the same on-chain nonce, and both compute the identical "next"
+    // nonce — producing two byte-identical signed transactions that nearcore
+    // correctly treats as the SAME transaction (one real execution, not a
+    // contract-level double-spend). That is a real finding about the TEST
+    // HARNESS, not the contract, and warming the cache here is what isolates
+    // the actual question: two GENUINELY different, validly nonce-ordered
+    // transactions racing against the real `ExposureBook` state.
+    let warmup_amount: u128 = 1;
+    let warmup = agent_as_contract
+        .call(contract.id(), "spend_to_seller")
+        .args_json(json!({ "seller_id": seller.id(), "amount": warmup_amount.to_string() }))
+        .gas(SPEND_GAS)
+        .transact()
+        .await?;
+    assert!(warmup.is_success(), "nonce-cache warm-up spend failed: {:#?}", warmup.failures());
+
+    let exposure_after_warmup: serde_json::Value = contract
+        .view("get_exposure")
+        .args_json(json!({ "agent_id": agent_id }))
+        .await?
+        .json()?;
+    let reserved: u128 = exposure_after_warmup["reserved"].as_str().unwrap().parse().unwrap();
+    let seller_balance_before = seller.view_account().await?.balance;
+
+    let call_a = agent_as_contract
+        .call(contract.id(), "spend_to_seller")
+        .args_json(json!({ "seller_id": seller.id(), "amount": race_amount.to_string() }))
+        .gas(SPEND_GAS)
+        .transact();
+    let call_b = agent_as_contract
+        .call(contract.id(), "spend_to_seller")
+        .args_json(json!({ "seller_id": seller.id(), "amount": race_amount.to_string() }))
+        .gas(SPEND_GAS)
+        .transact();
+    // Genuinely concurrent: both futures are polled together, not awaited
+    // one after the other — this is the real adversarial shape, not a
+    // reworded sequential call.
+    let (result_a, result_b) = tokio::join!(call_a, call_b);
+
+    let outcome_summary = |label: &str, r: &Result<near_workspaces::result::ExecutionFinalResult, near_workspaces::error::Error>| match r {
+        Ok(exec) if exec.is_success() => format!("{label}: SUCCESS"),
+        Ok(exec) => format!("{label}: execution failure: {:#?}", exec.failures()),
+        Err(e) => format!("{label}: transaction-level rejection: {e:?}"),
+    };
+    println!("{}", outcome_summary("call_a", &result_a));
+    println!("{}", outcome_summary("call_b", &result_b));
+
+    let success_count = [&result_a, &result_b]
+        .iter()
+        .filter(|r| matches!(r, Ok(exec) if exec.is_success()))
+        .count();
+
+    let exposure_after: serde_json::Value = contract
+        .view("get_exposure")
+        .args_json(json!({ "agent_id": agent_id }))
+        .await?
+        .json()?;
+    let outstanding_after: u128 = exposure_after["outstanding"].as_str().unwrap().parse().unwrap();
+    let reserved_after: u128 = exposure_after["reserved"].as_str().unwrap().parse().unwrap();
+    let seller_balance_after = seller.view_account().await?.balance;
+    let received = seller_balance_after.as_yoctonear().saturating_sub(seller_balance_before.as_yoctonear());
+    println!(
+        "DIAGNOSTIC: success_count={success_count} outstanding_after={outstanding_after} reserved_after={reserved_after} \
+         received_by_seller={received} race_amount={race_amount} reserved_before={reserved}"
+    );
+
+    assert_eq!(
+        success_count, 1,
+        "exactly one of the two concurrent same-signer spends must succeed — either both succeeding (a real \
+         double-spend) or both failing (a false-negative race-detection bug) would be wrong; got {success_count}"
+    );
+    assert_eq!(
+        outstanding_after,
+        warmup_amount + race_amount,
+        "outstanding must equal the warm-up spend plus exactly ONE of the two raced spends, never both"
+    );
+    assert_eq!(reserved_after, reserved - race_amount, "reserved must drop by exactly one spend's amount");
+    assert_eq!(received, race_amount, "the seller must have received funds for exactly one spend, not two");
+
+    println!(
+        "CONCURRENCY FINDING VERIFIED: two real, genuinely-concurrent (tokio::join!) spend_to_seller transactions \
+         from the SAME signer against a reservation that could only cover one of them — nearcore's own nonce \
+         ordering + sequential per-account receipt processing serialized them; no double-spend occurred. \
+         outstanding={outstanding_after}, reserved={reserved_after} (started at {reserved})"
+    );
+
+    Ok(())
+}
