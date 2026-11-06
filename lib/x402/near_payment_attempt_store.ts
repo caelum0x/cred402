@@ -66,12 +66,81 @@ export class NearPaymentAttemptStore {
   private readonly memory = new Map<string, NearPaymentAttempt>();
   private readonly attemptById = new Map<string, string>();
   private readonly directory?: string;
+  // Second, independent claim index keyed by the REAL on-chain transaction
+  // hash rather than the self-declared PAYMENT-SIGNATURE header bytes. A
+  // transaction hash is public blockchain data: anyone can read a past
+  // payer's (signerId, transaction) pair off an explorer and re-submit it,
+  // re-encoded with different-but-ignored JSON fields (reordered keys, an
+  // extra padding field, etc.), to mint a brand-new `paymentProofHash` that
+  // decodes to the SAME already-settled transfer. Without this index, each
+  // such resubmission looks like a fresh, never-before-seen proof and sails
+  // through settlement, letting one real payment buy an unlimited number of
+  // paid resources for free. `txOwner` makes "this transaction already paid
+  // for something" its own durable fact, independent of how many different
+  // ways the proof can be re-encoded.
+  private readonly txOwner = new Map<string, string>();
+  private readonly txDirectory?: string;
 
   constructor(dataDir?: string) {
     if (dataDir) {
       this.directory = join(dataDir, "near-payment-attempts");
       mkdirSync(this.directory, { recursive: true, mode: 0o700 });
       this.loadExisting();
+      this.txDirectory = join(dataDir, "near-payment-attempts-by-tx");
+      mkdirSync(this.txDirectory, { recursive: true, mode: 0o700 });
+    }
+  }
+
+  /**
+   * Atomically claim `transaction` (a real NEAR tx hash) as proof for
+   * `paymentProofHash`. Returns the `paymentProofHash` that actually owns
+   * this transaction: either the one just passed in (first claim wins) or
+   * an earlier one if this transaction was already used as proof — in
+   * which case the caller must NOT treat the current request as a fresh,
+   * unpaid-for settlement. First-claim-wins is enforced durably via an
+   * exclusive (`wx`) file create, the same primitive `claim()` uses for
+   * `paymentProofHash`, so two concurrent requests racing the same real
+   * transaction can never both win.
+   */
+  claimTransaction(transaction: string, paymentProofHash: string): string {
+    if (!isValidNearHash(transaction)) throw new Error("invalid NEAR transaction hash");
+    this.assertHash(paymentProofHash);
+    const cached = this.txOwner.get(transaction);
+    if (cached) return cached;
+
+    if (!this.txDirectory) {
+      // No durable data dir configured (dev/in-memory mode) — best-effort,
+      // process-local uniqueness only.
+      this.txOwner.set(transaction, paymentProofHash);
+      return paymentProofHash;
+    }
+
+    const path = join(this.txDirectory, `${transaction}.json`);
+    try {
+      writeFileSync(path, JSON.stringify({ paymentProofHash }), { encoding: "utf8", mode: 0o600, flag: "wx" });
+      this.syncFile(path);
+      this.txOwner.set(transaction, paymentProofHash);
+      return paymentProofHash;
+    } catch (error) {
+      if (this.isAlreadyExists(error)) {
+        const existingOwner = this.readTxOwner(path);
+        if (existingOwner) {
+          this.txOwner.set(transaction, existingOwner);
+          return existingOwner;
+        }
+      }
+      throw error;
+    }
+  }
+
+  private readTxOwner(path: string): string | undefined {
+    try {
+      const parsed = JSON.parse(readFileSync(path, "utf8")) as { paymentProofHash?: unknown };
+      return typeof parsed.paymentProofHash === "string" && HASH.test(parsed.paymentProofHash)
+        ? parsed.paymentProofHash
+        : undefined;
+    } catch {
+      return undefined;
     }
   }
 

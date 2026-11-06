@@ -237,6 +237,32 @@ async function respondCreditScore(
     return;
   }
 
+  // Second, independent replay barrier keyed on the REAL on-chain
+  // transaction hash rather than the self-declared PAYMENT-SIGNATURE header
+  // bytes `paymentProofHash` is derived from. A transaction hash is public
+  // blockchain data — anyone can re-encode the SAME already-settled
+  // transfer's (signerId, transaction) pair inside a byte-different header
+  // (reordered JSON keys, an extra ignored field, ...) to mint a brand-new
+  // `paymentProofHash` that `replay()` above has never seen, and ride one
+  // real payment to an unlimited number of free resource grants. Reject
+  // that here, before the costly RPC settlement call, by durably claiming
+  // the transaction itself first-claim-wins.
+  const txOwnerProofHash = nearPaymentAttempts.claimTransaction(authorization.transaction, paymentProofHash);
+  if (txOwnerProofHash !== paymentProofHash) {
+    const owningAttempt = nearPaymentAttempts.getByProofHash(txOwnerProofHash);
+    nearPaymentAttempts.markFailed(paymentProofHash, "x402_payment_transaction_already_used");
+    if (owningAttempt?.requestHash === requestHash && owningAttempt.status === "settled" && owningAttempt.settlement) {
+      respondJson(200, owningAttempt.settlement.resourceResponse, owningAttempt.settlement.responseHeaders);
+      return;
+    }
+    respondJson(409, {
+      error: "x402_payment_transaction_already_used",
+      message: "This on-chain transaction has already been used as payment proof for a different request. Submit a new payment.",
+      payment_attempt_url: owningAttempt ? paymentAttemptUrl(owningAttempt.attemptId) : undefined,
+    });
+    return;
+  }
+
   const settlement = await nearCreditScore.settle(authorization);
   if (!settlement.success) {
     if (settlement.indeterminate) {
