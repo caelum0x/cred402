@@ -67,7 +67,8 @@
     "record:algorand": "node scripts/record_algorand_x402_demo.mjs",
     "x402:qie:check": "tsx scripts/qie_x402_check.ts",
     "x402:qie:ready": "tsx scripts/qie_x402_ready.ts",
-    "x402:qie:release-check": "tsx scripts/qie_x402_release_check.ts"
+    "x402:qie:release-check": "tsx scripts/qie_x402_release_check.ts",
+    "record:near-spend-guard": "node scripts/record_near_spend_guard_demo.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

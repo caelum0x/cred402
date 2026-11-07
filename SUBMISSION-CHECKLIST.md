@@ -35,6 +35,25 @@ owner-only (identity + a social post + the form submission).
       re-mints the SAME still-active key → a real spend that succeeds
       again on that key → dispute spike → freeze → revoked-key rejection
       — see "SpendGuard" section in `HACKATHON.md`.
+- [x] **Demo video recorded** (2026-11-07) — `scripts/record_near_spend_guard_demo.mjs`
+      (`npm run record:near-spend-guard`) screen-captures the real terminal
+      session of `npm run demo:near-spend-guard` with `asciinema`, then
+      renders it with `agg` + `ffmpeg`. Real output, real on-chain NEAR
+      Testnet calls against the live `spendguard-024e8dd6f7.testnet`
+      contract — not staged/fake terminal text. Files, all committed:
+      `media/cred402-near-spend-guard-demo.cast` (raw asciicast, full
+      fidelity — play with `asciinema play`), `.gif` and `.mp4` (17.0s,
+      1174x560, rendered from the real cast), `-poster.png` (thumbnail).
+      Covers the full required loop on camera: cargo build + 18 unit
+      tests + sandbox integration test green, then the live-Testnet bonus
+      run — 25 real `spend_to_seller` calls, a real `repay_credit_line`
+      call, a real `top_up_allowance` call, one more real spend on the
+      SAME original key, a dispute spike, a freeze, and a real rejected
+      post-freeze call, ending on the script's own
+      `real_spends: 25, revolving_credit_proved: true, scammer_frozen: true`
+      summary. A ready-to-post X draft referencing this video is at
+      `X-POST-DRAFT-2026-11-07.md` in this same directory (owner posts it
+      — needs a logged-in X account, see item 3 below).
 
 ## Owner-only (fill in before submitting)
 
@@ -60,15 +79,13 @@ owner-only (identity + a social post + the form submission).
 3. **Demo post on X (required, confirmed against the real hackathon page
    2026-11-05)** — must state you built this at NEAR HACKATHON, tag
    `@NEARProtocol` and `#NEARHackathon`, and have a demo video or
-   screenshots attached. Fastest path: record a ~60-90s screen capture of
-   the "How to run it" steps in `HACKATHON.md` (steps 2-4: status probe,
-   402 challenge, one real paid call against NEAR Testnet via
-   `examples/near-paid-score/typescript.ts`) or run `npm run
-   demo:near-spend-guard` for the SpendGuard revolving-credit loop (draw →
-   repay → top up → draw again → freeze, proven live in this repo). This
-   needs your logged-in X account, so it's not something this agent can do.
-   - Demo video/screenshot link: `[OWNER: fill in]`
-   - X/Twitter post URL (must tag @NEARProtocol + #NEARHackathon): `[OWNER: fill in]`
+   screenshots attached. **The video itself is now a finished artifact**
+   (`media/cred402-near-spend-guard-demo.mp4`, recorded 2026-11-07 — see
+   above), so the only remaining step is uploading it to X, which needs
+   your logged-in X account. A ready-to-post draft caption is in
+   `X-POST-DRAFT-2026-11-07.md` — copy it, attach the mp4, post.
+   - Demo video: `media/cred402-near-spend-guard-demo.mp4` (done, in-repo)
+   - X/Twitter post URL (must tag @NEARProtocol + #NEARHackathon): `[OWNER: fill in once posted]`
 
 4. **Submit the form** at [nearhackathon.com](https://nearhackathon.com)
    before **Nov 14, 2026 23:59 UTC** (results by Nov 18, 2026 23:59 UTC).
@@ -90,4 +107,5 @@ owner-only (identity + a social post + the form submission).
   and is unset.
 - Nothing was posted to X/Twitter and the hackathon form was not submitted
   — both require your logged-in accounts and are listed above as the only
-  remaining steps.
+  remaining steps. (The demo video itself is done and no longer part of
+  this gap — see item 3 above.)
